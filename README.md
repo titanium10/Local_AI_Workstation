@@ -26,3 +26,20 @@ documenting Running Llama 3.1 8B in my laptop
 
 ## 📂 Code Integration (Work in Progress)
 Plan to integrate this local model into my `My-Python-Journey` project using the Ollama Python library for automated study-aid generation.
+
+
+
+
+
+
+**Date:** April 5, 2026
+**Hardware:** RTX 5070 (8GB VRAM) | Samsung Book6 Ultra
+
+### Technical Milestone
+- **Model:** Llama 3.1 8B
+- **Framework:** Ollama (Windows PowerShell)
+- **Status:** Successful Local Inference
+- **Optimization:** 4-bit quantization utilized for VRAM efficiency.
+
+### Achievement
+Successfully bypassed cloud-based AI to run a private, 8-billion parameter model on local silicon. This setup provides 100% data privacy and zero latency for my 9th-grade developer workflow.
