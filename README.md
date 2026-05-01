@@ -75,7 +75,7 @@ Technical Achievement: Created a Context Injection Pipeline. By embedding an ide
 🧪 Multi-Modal Expansion (Vision)
 Model Added: Qwen3-Vision-4B-Instruct.
 
-Capability: Enabled visual processing. The system can now analyze screenshots of VEXcode logic and Roblox scripting environments, providing real-time visual debugging.
+Capability: Enabled visual processing. The system can now analyze screenshots of different environments, providing real-time visual debugging.
 
 VRAM Management: Optimized the RTX 5070’s 8GB VRAM to handle simultaneous text inference and vector search with zero thermal throttling.
 ### Personal Comments
