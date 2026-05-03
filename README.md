@@ -94,4 +94,5 @@ I know it has been a long time since I did anything but in that time I used the 
 I ran a benchmark test mith a weaker model to test my gpu strength for quantization. I have 2 images that I ran a benchmark using the model Phi 3-mini.
 -<img width="1200" height="600" alt="Screenshot 2026-05-03 212205" src="https://github.com/user-attachments/assets/eee3ca16-bbaa-4c13-b32f-afff169a489b" />
 -<img width="1200" height="600" alt="Screenshot 2026-05-03 212254" src="https://github.com/user-attachments/assets/00f2f9d3-efe8-45ba-adda-61e5c7336073" />
+- "Observed significant VRAM delta between text-only and vision models. Qwen3-Vision-4B requires ~7.4GB VRAM (92% utilization) compared to Llama 3.1 8B's ~5.8GB, despite having fewer parameters. Thermal performance remains stable at 41°C due to low active power draw (23W)."
 
