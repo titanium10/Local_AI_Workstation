@@ -85,5 +85,13 @@ ollama run llama3.1:8B.
 
 
 
-4/20/26
+###Log: 4/20/26 ###
 I know it has been a long time since I did anything but in that time I used the ai a lot, but I noticed a slight problem that struck with me and made it kind of anoyying to use and I would find myself using gemini later. The problem I was facing was the memory... The ai wouldn't remember what I said to it a previous chat and if I shut down the computer or closed the terminal it would forget. So after a bit of resillience I decided to just directly take charge and added AnythingLLM, it also benefited me in many ways even included the Ctrl + SLASH  shortcut which would open a thread for me to ask questions when i'm in the middle of something. And also the Meeting Assistant which i'm really excited to try out later when I have my online classes.
+
+
+
+###Log: 5/3/26 Performance Benchmarking & Hardware Telemetry###
+I ran a benchmark test mith a weaker model to test my gpu strength for quantization. I have 2 images that I ran a benchmark using the model Phi 3-mini.
+-<img width="1920" height="1080" alt="Screenshot 2026-05-03 212205" src="https://github.com/user-attachments/assets/eee3ca16-bbaa-4c13-b32f-afff169a489b" />
+-<img width="1492" height="872" alt="Screenshot 2026-05-03 212254" src="https://github.com/user-attachments/assets/00f2f9d3-efe8-45ba-adda-61e5c7336073" />
+
