@@ -85,14 +85,29 @@ ollama run llama3.1:8B.
 
 
 
-###Log: 4/20/26 ###
+### Log: 4/20/26 
 I know it has been a long time since I did anything but in that time I used the ai a lot, but I noticed a slight problem that struck with me and made it kind of anoyying to use and I would find myself using gemini later. The problem I was facing was the memory... The ai wouldn't remember what I said to it a previous chat and if I shut down the computer or closed the terminal it would forget. So after a bit of resillience I decided to just directly take charge and added AnythingLLM, it also benefited me in many ways even included the Ctrl + SLASH  shortcut which would open a thread for me to ask questions when i'm in the middle of something. And also the Meeting Assistant which i'm really excited to try out later when I have my online classes.
 
 
 
-###Log: 5/3/26 Performance Benchmarking & Hardware Telemetry###
+### Log: 5/3/26 Performance Benchmarking & Hardware Telemetry
 I ran a benchmark test mith a weaker model to test my gpu strength for quantization. I have 2 images that I ran a benchmark using the model Phi 3-mini.
--<img width="1200" height="600" alt="Screenshot 2026-05-03 212205" src="https://github.com/user-attachments/assets/eee3ca16-bbaa-4c13-b32f-afff169a489b" />
--<img width="1200" height="600" alt="Screenshot 2026-05-03 212254" src="https://github.com/user-attachments/assets/00f2f9d3-efe8-45ba-adda-61e5c7336073" />
-- "Observed significant VRAM delta between text-only and vision models. Qwen3-Vision-4B requires ~7.4GB VRAM (92% utilization) compared to Llama 3.1 8B's ~5.8GB, despite having fewer parameters. Thermal performance remains stable at 41°C due to low active power draw (23W)."
+- <img width="1200" height="600" alt="Screenshot 2026-05-03 212205" src="https://github.com/user-attachments/assets/eee3ca16-bbaa-4c13-b32f-afff169a489b" />
+- <img width="1200" height="600" alt="Screenshot 2026-05-03 212254" src="https://github.com/user-attachments/assets/00f2f9d3-efe8-45ba-adda-61e5c7336073" />
+-  "Observed significant VRAM delta between text-only and vision models. Qwen3-Vision-4B requires ~7.4GB VRAM (92% utilization) compared to Llama 3.1 8B's ~5.8GB, despite having fewer parameters. Thermal performance remains stable at 41°C due to low active power draw (23W)."
 
+
+
+### Log:5/4/26 Setting up a local Vector Memory
+## Overview
+Successfully integrated ChromaDB as a persistent vector database layer. This allows the local workstation to store and retrieve information based on semantic meaning (intent) rather than just keyword matching. This is the foundation for my future RAG (Retrieval-Augmented Generation) system to assist with IB Math studies.
+
+## Key Features Implemented
+Persistent Storage: Transitioned from EphemeralClient to PersistentClient to ensure data survives system reboots.
+
+## Collection Management: Used get_or_create_collection to allow for seamless data updates without duplicating database entries.
+
+## Semantic Search: Verified that the system can find related concepts (e.g., matching "portable computer" to "laptop") using vector embeddings.
+
+### Personal Comments
+Yes, I did use ai for the code and integration, this is my first time getting involved in storing data as a vector database. I'm actually really flabbergasted on how ai has now improved and I ran this on my computer with the help of gemini. I am a solo man who wants to learn all of this AI myself using ai's help. This is getting more interessting and yes I was commited so I also did a project today.
