@@ -102,12 +102,14 @@ I ran a benchmark test mith a weaker model to test my gpu strength for quantizat
 ## Overview
 Successfully integrated ChromaDB as a persistent vector database layer. This allows the local workstation to store and retrieve information based on semantic meaning (intent) rather than just keyword matching. This is the foundation for my future RAG (Retrieval-Augmented Generation) system to assist with IB Math studies.
 
-## Key Features Implemented
+# Key Features Implemented
 Persistent Storage: Transitioned from EphemeralClient to PersistentClient to ensure data survives system reboots.
 
-## Collection Management: Used get_or_create_collection to allow for seamless data updates without duplicating database entries.
+# Collection Management: 
+Used get_or_create_collection to allow for seamless data updates without duplicating database entries.
 
-## Semantic Search: Verified that the system can find related concepts (e.g., matching "portable computer" to "laptop") using vector embeddings.
+# Semantic Search: 
+Verified that the system can find related concepts (e.g., matching "portable computer" to "laptop") using vector embeddings.
 
 ### Personal Comments
 Yes, I did use ai for the code and integration, this is my first time getting involved in storing data as a vector database. I'm actually really flabbergasted on how ai has now improved and I ran this on my computer with the help of gemini. I am a solo man who wants to learn all of this AI myself using ai's help. This is getting more interessting and yes I was commited so I also did a project today.
