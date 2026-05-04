@@ -98,17 +98,17 @@ I ran a benchmark test mith a weaker model to test my gpu strength for quantizat
 
 
 
-### Log:5/4/26 Setting up a local Vector Memory
-## Overview
+## Log:5/4/26 Setting up a local Vector Memory
+### Overview
 Successfully integrated ChromaDB as a persistent vector database layer. This allows the local workstation to store and retrieve information based on semantic meaning (intent) rather than just keyword matching. This is the foundation for my future RAG (Retrieval-Augmented Generation) system to assist with IB Math studies.
 
-# Key Features Implemented
+#### Key Features Implemented
 Persistent Storage: Transitioned from EphemeralClient to PersistentClient to ensure data survives system reboots.
 
-# Collection Management: 
+#### Collection Management: 
 Used get_or_create_collection to allow for seamless data updates without duplicating database entries.
 
-# Semantic Search: 
+#### Semantic Search: 
 Verified that the system can find related concepts (e.g., matching "portable computer" to "laptop") using vector embeddings.
 
 ### Personal Comments
