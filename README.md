@@ -1,4 +1,4 @@
-eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee# Local_AI_Workstation
+# Local_AI_Workstation
 documenting Running Llama 3.1 8B in my laptop
 
 ## 🛠 Hardware Configuration
