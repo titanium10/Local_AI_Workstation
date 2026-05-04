@@ -1,4 +1,4 @@
-# Local_AI_Workstation
+eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee# Local_AI_Workstation
 documenting Running Llama 3.1 8B in my laptop
 
 ## 🛠 Hardware Configuration
@@ -113,3 +113,11 @@ Verified that the system can find related concepts (e.g., matching "portable com
 
 ### Personal Comments
 Yes, I did use ai for the code and integration, this is my first time getting involved in storing data as a vector database. I'm actually really flabbergasted on how ai has now improved and I ran this on my computer with the help of gemini. I am a solo man who wants to learn all of this AI myself using ai's help. This is getting more interessting and yes I was commited so I also did a project today.
+
+
+
+## Log 2: 5/4/26 Local_Inference_Deployment (app.py)
+### Overview
+I made a significant progress from locally hosting to web-based interface using streamlit to host app.py. I also integrated Ngrok so I can give this ai feature to other people around me that aren't connected to my wifi and also made it secure via https link. I aLso learnyt how to manage multiple powershell windows simuntaniously running different things.
+### personal comments
+Today was a great day, I set up 2 really important things in a day with the amount of time I had. Since today was a holiday it gave me extra time work on ai. Im kind of happy with what I have now, the ai model has some issues like the context window is only one question and it can't see previous questions. I will update that in the future, and make it more better so other people can use it reliably. I have given this link out and will ask for feedback from other users so I can improve my model and I will try to look into fine tuning in the future.
