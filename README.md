@@ -121,3 +121,21 @@ Yes, I did use ai for the code and integration, this is my first time getting in
 I made a significant progress from locally hosting to web-based interface using streamlit to host app.py. I also integrated Ngrok so I can give this ai feature to other people around me that aren't connected to my wifi and also made it secure via https link. I aLso learnyt how to manage multiple powershell windows simuntaniously running different things.
 ### personal comments
 Today was a great day, I set up 2 really important things in a day with the amount of time I had. Since today was a holiday it gave me extra time work on ai. Im kind of happy with what I have now, the ai model has some issues like the context window is only one question and it can't see previous questions. I will update that in the future, and make it more better so other people can use it reliably. I have given this link out and will ask for feedback from other users so I can improve my model and I will try to look into fine tuning in the future.
+
+
+
+## Log: 5/10/26 — Full Stack Rebuild: Flask + SQLite Migration
+### Overview
+Completely rebuilt the web interface from Streamlit to a custom Flask application with a hand-coded HTML/CSS/JS frontend. This was a major architectural upgrade driven by Streamlit's fundamental limitations around multi-user session persistence. it is way more functional with more graphical representations.
+### Problem Solved
+Streamlit resets `session_state` on every page reload — meaning users lost their entire chat history the moment they refreshed. No workaround existed without a proper backend.
+### Features Added
+- ✅ Persistent chat history per user (survives reload, close, reopen)
+- ✅ Multi-chat with sidebar navigation
+- ✅ Real-time token streaming (word by word like ChatGPT)
+- ✅ Stop generation mid-response
+- ✅ Dark/light mode toggle (saved to localStorage)
+- ✅ Emoji picker with 28 emojis
+- ✅ ngrok tunnel for external access
+### Personal Comments
+Iv've been working on this basically the whole week after setting up streamlit and ngrok. I moved to flask it was a bit harder to set up but it was way more convenient since now people can have private chats without other people looking at it or having the doubt that I will look at it. This took way to long than what I thought it would andf streamlit would not do what I want so that also wasted time but in all I think I have learnt a lot about this and still want to learn more. I also made the phone web page for it so people using phone can also access it.
