@@ -1,1 +1,5 @@
 chroma_db/
+chats.db
+chat_sessions/
+__pycache__/
+*.pyc
