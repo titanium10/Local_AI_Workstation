@@ -1,0 +1,20 @@
+# Requirements for Samrat's Local AI Workstation
+# Install everything with: pip install -r requirements.txt
+
+# Flask — the web framework that runs the server
+flask
+
+# Requests — lets Python make HTTP calls to Ollama's API
+requests
+
+# ChromaDB — local vector database for RAG (PDF document storage and search)
+chromadb
+
+# pypdf — reads PDF files and extracts text from them
+pypdf
+
+# sentence-transformers — converts text into vectors for ChromaDB semantic search
+sentence-transformers
+
+# duckduckgo-search — powers the smart web search feature
+duckduckgo-search
