@@ -1,5 +1,5 @@
 # Local_AI_Workstation
-####documenting my journey thorough my dream to become an ai engineer. 
+#### documenting my journey thorough my dream to become an ai engineer. 
 (all the coding has been done with ai, firstly I used gemini then moved to claude Sonnet 4.6 and Opus 4.6/Opus 4.7, I only prompt the ai to do and if I notice a problem I ask it to rewrite and change that part of the code)
 
 ## 🛠 Hardware Configuration
