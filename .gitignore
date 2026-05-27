@@ -3,3 +3,6 @@ chats.db
 chat_sessions/
 __pycache__/
 *.pyc
+uploads/
+venv/
+.env
