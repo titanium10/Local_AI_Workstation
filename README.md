@@ -37,10 +37,21 @@ Plan to integrate this local model into my `My-Python-Journey` project using the
 **Hardware:** RTX 5070 (8GB VRAM) | Samsung Book6 Ultra
 
 ### Technical Milestone
-- **Model:** Llama 3.1 8B
+- **Model:** Llama 3.1 8B, Llava 7B
 - **Framework:** Ollama (Windows PowerShell)
 - **Status:** Successful Local Inference
 - **Optimization:** 4-bit quantization utilized for VRAM efficiency.
+
+## 🚀 Technical Highlights & What I Built
+
+As the sole developer of this platform, I focused on making a fast, 100% private AI chat tool that runs entirely on my laptop. Here are the main technical problems I solved:
+
+* **Smart Hardware Management:** I configured the AI model to use 4-bit quantization so it stays under my laptop's 8GB VRAM limit. I also made sure text models (~5.8GB VRAM) and vision models (~7.4GB VRAM) can run without overheating or crashing my computer.
+* **Instant Text Streaming:** Instead of making the user wait for the AI to think of the entire answer at once, I used an `XHR onprogress` script. This streams the text word-by-word onto the screen the exact millisecond the local GPU generates it.
+* **Remembering User Data:** Standard local AI tools forget everything the moment you close the terminal. I fixed this by connecting a SQLite database and Flask sessions, so the app remembers who you are and keeps your chat history saved safely on disk.
+* **Local Document Memory (RAG):** I hooked up ChromaDB as a local memory bank. When I upload a PDF, the app breaks down the text, turns it into vector math, and injects the relevant facts directly into the AI's prompt so it can answer questions about my school studies.
+
+
 
 ### Achievement
 Successfully bypassed cloud-based AI to run a private, 8-billion parameter model on local silicon. This setup provides 100% data privacy and zero latency for my 9th-grade developer workflow.
