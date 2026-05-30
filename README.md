@@ -91,7 +91,7 @@ Capability: Enabled visual processing. The system can now analyze screenshots of
 VRAM Management: Optimized the RTX 5070’s 8GB VRAM to handle simultaneous text inference and vector search with zero thermal throttling.
 ### Personal Comments
 4/6/26
-I'm stil not used to how I have to start a new conversation every time I close the terminal. I will try to code in a something so the ai remembers me and basic information about me everytime I open the termninal and login. Also now it's easier for me to open it rather than typing 
+I'm stil not used to how I have to start a new conversation every time I close the terminal. I will try to code in a something so the ai remembers me and basic information about me everytime I open the terminal and login. Also now it's easier for me to open it rather than typing 
 ollama run llama3.1:8B.
 
 
