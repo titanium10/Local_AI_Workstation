@@ -95,8 +95,9 @@ for /f "delims=" %%i in ('powershell -Command "(Invoke-WebRequest -Uri http://lo
 :: ── STEP 6: Open browser ───────────────────────────────────────────
 echo  [..] Opening browser...
 start "" "http://localhost:5000"
-:: "start" with a URL opens it in your default browser.
-:: The "" before the URL is a required empty window title — don't remove it.
+:: Opens the main app in your default browser.
+start "" "http://localhost:5000/stats"
+:: Opens the stats dashboard in a second tab automatically.
 
 :: ── STEP 7: Show the summary ───────────────────────────────────────
 echo.
