@@ -6,6 +6,7 @@ import requests
 import json
 import os
 import base64
+import time  # NEW: we need time to calculate tokens per second
 
 os.environ['PYTHONUNBUFFERED'] = '1'
 
@@ -19,23 +20,27 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
 DB_FILE = "chats.db"
 CHROMA_PATH = r"C:\Users\samra\OneDrive\Desktop\Chroma DB Real"
-
-# NEW: UPLOADS_FOLDER is where we save image files on disk.
-# Instead of storing huge base64 strings in SQLite, we save the actual
-# image file here and only store the filename in the database.
-# os.path.join builds a path correctly on any OS:
-# os.path.join("Local AI", "uploads") → "Local AI\uploads" on Windows
 UPLOADS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
-# os.path.abspath(__file__) = the full path to app.py
-# os.path.dirname(...) = the folder that contains app.py
-# So UPLOADS_FOLDER = "C:\Users\samra\OneDrive\Desktop\Local AI\uploads"
-
-# Create the uploads folder if it doesn't exist yet
 os.makedirs(UPLOADS_FOLDER, exist_ok=True)
-# exist_ok=True means: if the folder already exists, don't crash — just continue
 
 chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
 collection = chroma_client.get_or_create_collection(name="rag_docs")
+
+# NEW: These are global variables that track live generation stats.
+# "Global" means they exist outside any function — they stay alive as long
+# as Flask is running. Every request can read and write them.
+#
+# Think of them like a scoreboard on the wall — anyone can look at it,
+# and it gets updated whenever something changes.
+live_stats = {
+    "is_generating": False,      # True when the AI is currently writing a response
+    "tokens_this_response": 0,   # how many tokens generated in current response
+    "last_tps": 0.0,             # tokens per second from the last completed response
+    "last_model": "",            # which model was used last (llama3 or llava)
+    "generation_start": None,    # when the current generation started (timestamp)
+}
+# We use a dictionary (key-value pairs wrapped in {}) so all stats are
+# in one place. Easier to pass around and extend later.
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -57,9 +62,6 @@ def init_db():
         c.execute("ALTER TABLE chats ADD COLUMN doc_name TEXT")
     except:
         pass
-    # NEW: Add image_file column to chats table.
-    # This stores the saved filename of the uploaded image, e.g. "abc123.png"
-    # We store the filename, not the full path, because paths can change.
     try:
         c.execute("ALTER TABLE chats ADD COLUMN image_file TEXT")
     except:
@@ -131,14 +133,192 @@ def index():
     get_user_id()
     return render_template("index2.html")
 
-# NEW: This route serves image files from the uploads folder.
-# When the browser requests /uploads/abc123.png, Flask finds that file
-# in the UPLOADS_FOLDER and sends it back.
-# send_from_directory is Flask's safe way to serve files — it prevents
-# attackers from requesting files outside the uploads folder (like ../../passwords.txt)
 @app.route("/uploads/<filename>")
 def uploaded_file(filename):
     return send_from_directory(UPLOADS_FOLDER, filename)
+
+# NEW: This is the stats dashboard route.
+# Only accessible at localhost:5000/stats — not linked anywhere in the UI.
+# Returns an HTML page with all usage stats and live generation info.
+# No password needed since ngrok users can't guess this URL easily,
+# and you can always add a password later.
+@app.route("/stats")
+def stats():
+    conn = get_db()
+
+    # COUNT total messages (excluding image role messages)
+    # COUNT(*) counts all rows. WHERE filters which ones.
+    total_messages = conn.execute(
+        "SELECT COUNT(*) FROM messages WHERE role IN ('user', 'assistant')"
+    ).fetchone()[0]
+    # .fetchone() gets one row. [0] gets the first column of that row (the count).
+
+    # COUNT total chats
+    total_chats = conn.execute(
+        "SELECT COUNT(*) FROM chats"
+    ).fetchone()[0]
+
+    # COUNT unique users
+    # DISTINCT means "don't count duplicates" — each user_id counted once
+    total_users = conn.execute(
+        "SELECT COUNT(DISTINCT user_id) FROM chats"
+    ).fetchone()[0]
+
+    # COUNT messages sent today
+    # date('now') is SQLite's way of getting today's date as "2026-05-28"
+    # created_at is stored as ISO format like "2026-05-28T14:30:00"
+    # LIKE '2026-05-28%' matches anything starting with today's date
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
+    messages_today = conn.execute(
+        "SELECT COUNT(*) FROM messages WHERE role='user' AND created_at LIKE ?",
+        (today + "%",)
+    ).fetchone()[0]
+
+    # FIND the busiest day ever
+    # strftime('%Y-%m-%d', created_at) extracts just the date part from the timestamp
+    # GROUP BY groups all messages from the same day together
+    # COUNT(*) counts how many messages in each group
+    # ORDER BY COUNT(*) DESC sorts from most to least
+    # LIMIT 1 takes only the top result
+    busiest = conn.execute(
+        """SELECT strftime('%Y-%m-%d', created_at) as day, COUNT(*) as cnt
+           FROM messages WHERE role='user'
+           GROUP BY day ORDER BY cnt DESC LIMIT 1"""
+    ).fetchone()
+    busiest_day = f"{busiest['day']} ({busiest['cnt']} messages)" if busiest else "No data yet"
+
+    # GET messages per day for the last 7 days (for the mini chart)
+    last7 = conn.execute(
+        """SELECT strftime('%Y-%m-%d', created_at) as day, COUNT(*) as cnt
+           FROM messages WHERE role='user'
+           AND created_at >= date('now', '-7 days')
+           GROUP BY day ORDER BY day ASC"""
+    ).fetchall()
+    # date('now', '-7 days') = 7 days ago. SQLite date math is that simple.
+
+    conn.close()
+
+    # Calculate live TPS if currently generating
+    current_tps = 0.0
+    if live_stats["is_generating"] and live_stats["generation_start"]:
+        elapsed = time.time() - live_stats["generation_start"]
+        # time.time() returns current time as seconds since 1970 (a Unix timestamp)
+        # Subtracting the start time gives us how many seconds have passed
+        if elapsed > 0 and live_stats["tokens_this_response"] > 0:
+            current_tps = live_stats["tokens_this_response"] / elapsed
+            # tokens divided by seconds = tokens per second
+
+    # Build the HTML page as a string and return it directly.
+    # We're not using a template file for this — just building the HTML here
+    # because the stats page is simple and only for you.
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Samrat's AI — Stats</title>
+    <meta http-equiv="refresh" content="3">
+    <!-- meta refresh: browser automatically reloads this page every 3 seconds -->
+    <!-- This is how we get "live" updates without any JavaScript needed -->
+    <style>
+        body {{ font-family: 'Courier New', monospace; background: #0a0a0f; color: #e0e0e0; padding: 40px; }}
+        h1 {{ color: #7f77dd; margin-bottom: 30px; }}
+        h2 {{ color: #7f77dd; margin-top: 30px; font-size: 16px; text-transform: uppercase; letter-spacing: 2px; }}
+        .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }}
+        .card {{ background: #13131a; border: 1px solid #2a2a3a; border-radius: 12px; padding: 20px; }}
+        .card .label {{ color: #888; font-size: 12px; margin-bottom: 8px; }}
+        .card .value {{ color: #fff; font-size: 28px; font-weight: bold; }}
+        .live {{ border-color: {'#7f77dd' if live_stats['is_generating'] else '#2a2a3a'}; }}
+        .live .value {{ color: {'#7f77dd' if live_stats['is_generating'] else '#555'}; }}
+        .status-dot {{ display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+                       background: {'#7f77dd' if live_stats['is_generating'] else '#333'};
+                       margin-right: 8px;
+                       {'animation: pulse 1s infinite;' if live_stats['is_generating'] else ''} }}
+        @keyframes pulse {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0.3; }} }}
+        .bar-wrap {{ margin: 6px 0; }}
+        .bar-label {{ font-size: 12px; color: #888; margin-bottom: 3px; }}
+        .bar {{ height: 20px; background: #7f77dd; border-radius: 4px; min-width: 4px; }}
+        .footer {{ color: #444; font-size: 12px; margin-top: 40px; }}
+    </style>
+</head>
+<body>
+    <h1>⚡ Samrat's AI — Dashboard</h1>
+    <p style="color:#555; margin-top:-20px; margin-bottom:30px;">Auto-refreshes every 3 seconds</p>
+
+    <h2>📊 Usage Stats</h2>
+    <div class="grid">
+        <div class="card">
+            <div class="label">Total Messages</div>
+            <div class="value">{total_messages:,}</div>
+        </div>
+        <div class="card">
+            <div class="label">Total Chats</div>
+            <div class="value">{total_chats:,}</div>
+        </div>
+        <div class="card">
+            <div class="label">Unique Users</div>
+            <div class="value">{total_users:,}</div>
+        </div>
+        <div class="card">
+            <div class="label">Messages Today</div>
+            <div class="value">{messages_today:,}</div>
+        </div>
+        <div class="card">
+            <div class="label">Busiest Day</div>
+            <div class="value" style="font-size:16px; padding-top:6px;">{busiest_day}</div>
+        </div>
+    </div>
+
+    <h2>🔴 Live Generation</h2>
+    <div class="grid">
+        <div class="card live">
+            <div class="label"><span class="status-dot"></span>Status</div>
+            <div class="value" style="font-size:20px;">{'🟣 Generating...' if live_stats['is_generating'] else '⚫ Idle'}</div>
+        </div>
+        <div class="card live">
+            <div class="label">Tokens This Response</div>
+            <div class="value">{live_stats['tokens_this_response']:,}</div>
+        </div>
+        <div class="card live">
+            <div class="label">Current TPS</div>
+            <div class="value">{current_tps:.1f} <span style="font-size:14px;color:#888;">t/s</span></div>
+        </div>
+        <div class="card live">
+            <div class="label">Last Completed TPS</div>
+            <div class="value">{live_stats['last_tps']:.1f} <span style="font-size:14px;color:#888;">t/s</span></div>
+        </div>
+        <div class="card live">
+            <div class="label">Model</div>
+            <div class="value" style="font-size:18px;">{live_stats['last_model'] or '—'}</div>
+        </div>
+    </div>
+
+    <h2>📅 Last 7 Days</h2>
+    <div style="background:#13131a; border:1px solid #2a2a3a; border-radius:12px; padding:20px;">"""
+
+    # Build the mini bar chart for last 7 days
+    # We need the max count to scale the bars proportionally
+    max_count = max([r['cnt'] for r in last7], default=1)
+    for row in last7:
+        bar_width = int((row['cnt'] / max_count) * 300)  # scale to max 300px wide
+        html += f"""
+        <div class="bar-wrap">
+            <div class="bar-label">{row['day']} — {row['cnt']} messages</div>
+            <div class="bar" style="width:{bar_width}px;"></div>
+        </div>"""
+
+    if not last7:
+        html += "<p style='color:#555;'>No messages in the last 7 days yet.</p>"
+
+    html += f"""
+    </div>
+
+    <div class="footer">
+        Last updated: {datetime.datetime.now().strftime("%H:%M:%S")} —
+        Only visible at /stats — not linked in the UI
+    </div>
+</body>
+</html>"""
+
+    return html
 
 @app.route("/api/chats", methods=["GET"])
 def get_chats():
@@ -157,7 +337,6 @@ def create_chat():
     name = request.json.get("name", "New Conversation")
     now = datetime.datetime.now().isoformat()
     conn = get_db()
-    # CHANGED: Now inserting 6 values — added None for image_file column
     conn.execute("INSERT INTO chats VALUES (?,?,?,?,?,?)", (chat_id, uid, name, now, None, None))
     conn.commit()
     conn.close()
@@ -167,29 +346,21 @@ def create_chat():
 def delete_chat(chat_id):
     uid = get_user_id()
     conn = get_db()
-
-    # NEW: Before deleting the chat, get the image_file so we can delete it from disk too
     chat_row = conn.execute("SELECT image_file FROM chats WHERE id=?", (chat_id,)).fetchone()
     if chat_row and chat_row["image_file"]:
-        # Build the full path to the image file and delete it
         img_path = os.path.join(UPLOADS_FOLDER, chat_row["image_file"])
         if os.path.exists(img_path):
             os.remove(img_path)
-            # os.remove() deletes a file. We check exists() first so we don't crash
-            # if the file is already gone.
-
     conn.execute("DELETE FROM messages WHERE chat_id=?", (chat_id,))
     conn.execute("DELETE FROM chats WHERE id=? AND user_id=?", (chat_id, uid))
     conn.commit()
     conn.close()
-
     try:
         existing = collection.get(where={"chat_id": chat_id})
         if existing["ids"]:
             collection.delete(ids=existing["ids"])
     except:
         pass
-
     return jsonify({"ok": True})
 
 @app.route("/api/chats/<chat_id>/messages", methods=["GET"])
@@ -208,20 +379,16 @@ def upload_file(chat_id):
     chat_row = conn.execute(
         "SELECT * FROM chats WHERE id=? AND user_id=?", (chat_id, uid)
     ).fetchone()
-
     if not chat_row:
         conn.close()
         return jsonify({"error": "Chat not found"}), 404
-
     file = request.files.get("file")
     if not file:
         conn.close()
         return jsonify({"error": "No file provided"}), 400
-
     filename = file.filename
     file_bytes = file.read()
     ext = filename.rsplit(".", 1)[-1].lower()
-
     if ext == "pdf":
         text = extract_pdf_text(file_bytes)
         if not text.strip():
@@ -233,48 +400,22 @@ def upload_file(chat_id):
         conn.commit()
         conn.close()
         return jsonify({"ok": True, "type": "pdf", "filename": filename, "chunks": num_chunks})
-
     elif ext in ["png", "jpg", "jpeg", "gif", "webp"]:
-        # CHANGED: Instead of storing base64 in SQLite, we now save the image
-        # as a real file on disk and store just the filename.
-
-        # Generate a unique filename so two users uploading "photo.png" don't
-        # overwrite each other. uuid4() creates a random unique ID.
         saved_filename = f"{uuid.uuid4()}.{ext}"
-        # Example result: "a3f8c2d1-4b5e-6789-abcd-ef0123456789.png"
-
         save_path = os.path.join(UPLOADS_FOLDER, saved_filename)
-        # Full path: "C:\...\Local AI\uploads\a3f8c2d1-....png"
-
         with open(save_path, "wb") as f:
             f.write(file_bytes)
-        # "wb" = write binary mode. Images are binary data (not text),
-        # so we must open the file in binary mode, not regular text mode.
-
-        # If this chat already had an image, delete the old one from disk
-        # before storing the new one. We don't want orphaned files piling up.
         if chat_row["image_file"]:
             old_path = os.path.join(UPLOADS_FOLDER, chat_row["image_file"])
             if os.path.exists(old_path):
                 os.remove(old_path)
-
-        # Store the saved filename AND the original display name in the database
         conn.execute(
             "UPDATE chats SET doc_name=?, image_file=? WHERE id=?",
             (filename, saved_filename, chat_id)
         )
         conn.commit()
         conn.close()
-
-        return jsonify({
-            "ok": True,
-            "type": "image",
-            "filename": filename,
-            # NEW: return the URL path so the browser can display the image
-            # The browser will request /uploads/saved_filename to see it
-            "url": f"/uploads/{saved_filename}"
-        })
-
+        return jsonify({"ok": True, "type": "image", "filename": filename, "url": f"/uploads/{saved_filename}"})
     else:
         conn.close()
         return jsonify({"error": f"Unsupported file type: .{ext}. Use PDF or image files."}), 400
@@ -292,34 +433,21 @@ def chat():
     if chat_row and chat_row["name"] == "New Conversation":
         name = prompt[:30] + ("..." if len(prompt) > 30 else "")
         conn.execute("UPDATE chats SET name=? WHERE id=?", (name, chat_id))
-
     conn.execute("INSERT INTO messages (chat_id, role, content, created_at) VALUES (?,?,?,?)",
                  (chat_id, "user", prompt, now))
     conn.commit()
-
     msgs = conn.execute(
         "SELECT role, content FROM messages WHERE chat_id=? ORDER BY id", (chat_id,)
     ).fetchall()
-
-    # CHANGED: Read image_file from the chats table directly.
-    # This is much cleaner than scanning through all messages for role="image".
     image_file = chat_row["image_file"] if chat_row else None
     conn.close()
 
-    # If there's an image file saved, read it from disk and convert to base64
-    # RIGHT NOW, just before sending to llava. This is more reliable than
-    # storing base64 in the database because:
-    # 1. The file on disk is always the original, clean image data
-    # 2. We're not dealing with huge strings being stored/retrieved from SQLite
     image_b64 = None
     if image_file:
         img_path = os.path.join(UPLOADS_FOLDER, image_file)
         if os.path.exists(img_path):
             with open(img_path, "rb") as f:
                 image_b64 = base64.b64encode(f.read()).decode("utf-8")
-            # "rb" = read binary mode
-            # base64.b64encode converts the raw bytes to base64
-            # .decode("utf-8") converts the base64 bytes object to a string
 
     search_context = ""
     search_triggers = ["what", "who", "where", "when", "why", "how", "?", "search", "latest"]
@@ -333,9 +461,7 @@ def chat():
             pass
 
     rag_context = search_chroma(chat_id, prompt)
-
     current_time = datetime.datetime.now().strftime("%I:%M %p on %A, %B %d, %Y")
-
     rag_instruction = ""
     if rag_context:
         rag_instruction = f"\n\nThe user has uploaded a document. Here are the most relevant sections:\n{rag_context}\n\nAnswer using this document content. If the answer isn't in the document, say so."
@@ -345,31 +471,18 @@ def chat():
         "content": f"You are a smart AI assistant. Time: {current_time}. Be concise. Use **bold** for key terms. {search_context}{rag_instruction}"
     }
 
-    # Filter out any old "image" role messages — we don't use that system anymore
     text_msgs = [m for m in msgs if m["role"] != "image"]
 
     if image_b64:
-        # CHANGED: Now we build the payload correctly.
-        # We send ALL previous text messages normally,
-        # then attach the image ONLY to the current (latest) user message.
-        # This is the correct way — the image stays attached to the conversation
-        # but doesn't get duplicated on every single message.
         messages_payload = [system_msg]
-
-        # Add all messages except the very last one (which is the current user message)
         for m in text_msgs[:-1]:
             messages_payload.append({"role": m["role"], "content": m["content"]})
-
-        # Add the current user message WITH the image
         messages_payload.append({
             "role": "user",
             "content": prompt,
             "images": [image_b64]
-            # llava reads this "images" list and processes the image alongside the text
         })
-
         model = "llava"
-
     else:
         messages_payload = [system_msg] + [
             {"role": m["role"], "content": m["content"]}
@@ -379,6 +492,15 @@ def chat():
 
     def generate():
         full_response = ""
+
+        # CHANGED: Update live_stats when generation starts
+        live_stats["is_generating"] = True
+        live_stats["tokens_this_response"] = 0
+        live_stats["generation_start"] = time.time()
+        live_stats["last_model"] = model
+        # time.time() gives us the current time as a float like 1748394823.45
+        # We'll subtract this from time.time() later to get elapsed seconds
+
         try:
             r = requests.post(
                 "http://localhost:11434/api/chat",
@@ -392,7 +514,24 @@ def chat():
                     if "message" in chunk:
                         word = chunk["message"]["content"]
                         full_response += word
+
+                        # CHANGED: Count tokens as they arrive
+                        # Each chunk from Ollama is roughly one token
+                        live_stats["tokens_this_response"] += 1
+
                         yield f"data: {json.dumps({'token': word})}\n\n"
+
+                    # NEW: Ollama sends a final chunk when done with eval stats
+                    # "eval_count" = total tokens generated
+                    # "eval_duration" = time taken in nanoseconds (1 billion nanoseconds = 1 second)
+                    if chunk.get("done") and "eval_count" in chunk and "eval_duration" in chunk:
+                        eval_count = chunk["eval_count"]
+                        eval_duration = chunk["eval_duration"]
+                        if eval_duration > 0:
+                            # Convert nanoseconds to seconds by dividing by 1 billion
+                            live_stats["last_tps"] = eval_count / (eval_duration / 1_000_000_000)
+                            # 1_000_000_000 is Python's way of writing 1000000000
+                            # The underscores are just for readability, like commas in math
 
             conn2 = get_db()
             conn2.execute(
@@ -405,6 +544,12 @@ def chat():
 
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+        finally:
+            # CHANGED: "finally" runs NO MATTER WHAT — even if there's an error
+            # or the user hits stop. This guarantees we always reset is_generating.
+            # Without this, the stats page would show "Generating..." forever after an error.
+            live_stats["is_generating"] = False
 
     return Response(
         generate(),
