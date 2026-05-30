@@ -8,7 +8,7 @@
 - **Architecture:** x86_64 Windows (PowerShell Environment)
 
 ## 🧠 Model Specifications
-- **Model:** Llama 3.1 8B (Quantized)
+- **Model:** Llama 3.1 8B (Quantized), Llava 7B (Quantized)
 - **Parameters:** 8 Billion
 - **Quantization:** 4-bit (Optimized for 8GB VRAM)
 - **Runtime:** Ollama (Local Inference Engine)
@@ -166,3 +166,17 @@ After learning the basics of RAG, I added RAG succesfully and tested it out with
 * This is a small decision and only completely affecting my storatge, I wanted to decide whether I wanted a RAG system per chat or globally, I first thought globally was better as the ai would know more information as people start uploading more pdfs. But a thought came to me that if I do that and someone puts a file with the same name or same concepts the model can give wrong information to the wrong audience, So i decided to go with per chat RAG systems.
 ### Personal comments
 it's been a long time since I have been active on github, my summatives were going on and I needed to spend more time on them to study, and I also wanted to take a break from ai as I had spent almost everyday adding a new feature. This did take me around 2 hours to implement and I haven't really sent it out for testing yet. going from gemini to Claude has completely changed the quality of the code, but form now I am also thinking to learn more about machine learning python. I haven't really been focusing on my other python repository as am really guilty about it, so I want to learn python so both the repositories stay active. The coding is completely done with ai and I only prompt made it.
+
+
+
+
+## Log: 5/30/26 — Live Usage Dashboard & TPS Monitoring
+### Overview
+I spent some time adding a stats board that displays basic stats like how many messagess typed the amount of tokens used and tps. The stats refresh every 3 seconds, it is only accesable by the host, and its not linked anywhere.
+### decisions
+* I have put the live stats as a dictionary, so it can track if the ai is active or idle, the token count, and the tps. and python is persistant as long as Flask is active, so when someone uses it I can see all of it without affecting the main database.
+* I've used the Finally block for making the code cleaner and preventing crashes, by using try/except/finally it always makes the is_generating to false so if the user stops the message, the dashboard won't still show generating and crash.
+* I just used Ollama's eval_count and eval_duration which is insanely accurate upto nanoseconds, to give me the most accurate tps.
+* the dashboard resets every 3 seconds using the (meta http-equiv="refresh") this is just html so I don't have to update index2.
+### Personal comments
+this was a short term decission as I spent most of my time looking for internships related to this so I get real feedback from ai engineers and hands on experiance, but apart from that the main reason I actually did this is to monitor how the ai model is doing, when many people use it it might slow down so I was thinking to add a queue so others can slowly use it without it crashing or becoming way too slow. This was also a really good excuse for me to learn more about tokens, so it is a win-win situation for me.
