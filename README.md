@@ -179,3 +179,19 @@ I spent some time adding a stats board that displays basic stats like how many m
 * the dashboard resets every 3 seconds using the (meta http-equiv="refresh") this is just html so I don't have to update index2.
 ### Personal comments
 this was a short term decission as I spent most of my time looking for internships related to this so I get real feedback from ai engineers and hands on experiance, but apart from that the main reason I actually did this is to monitor how the ai model is doing, when many people use it it might slow down so I was thinking to add a queue so others can slowly use it without it crashing or becoming way too slow. This was also a really good excuse for me to learn more about tokens, so it is a win-win situation for me.
+
+
+
+
+## Log: 6/7/26 — Voice to Voice, UI new design, and more settings
+### Overview
+I added a voice to voice conversation where you can toggle on or off depending upon if you want it or not. Also changed the UI with a maroon red theme and added new animation for aesthetivs, also added more settings like toggling light mode/dark mode, toggling on voice responce, choosing what voice the ai should respond in, added a toggle for web search, and lastly choosing the temperature of the ai from 0 to 1.
+### Problems solved
+The main problem I noticed was that you had to type everything to the app and i found that anoying as other models did have voice recognition, and the side setting panel only had one option which made it boring so i added more options, and I also wanted a uncensored version to myself as I also used the ai model for my personal use and I wanted other people using it to feel like it's a normal ai like other models.
+### Decisions
+* I first decided to use the browsers speach recognition but it required internet and also sends data to google, against my theme of keeping privacy for the users. I decided to Use whisper which runs locally on python and doesnt depend on cloud.
+* edge-tts for ai's voice output, it had the best voice quality compared to the other TTS options, it uses microsoft's servers for audio but conversation isnt sent.
+* edge-tts used to read **bold** as 'asterisk asterisk bold asterisk asterisk' so I removed all markdown before sending so the speech sounds good.
+* I added a variable called currentaudio so it tracks when the audio is playing and then stops when the user switches conversation or deletes a conversation.
+### Personal comments
+The main reason I actually added voice to voice was so that I can just speak long messages and its more efficient and the ai responds in a voice so I can hear what it says while doing sommething else on the computer which is really efficient. I also chose a new UI I like the color maroon red, and purple really didn't seem my fit and I heavily like aesthetics so I also added more animation while I'm at changing the UI. I also added a uncensored version for myself because I use it for my personal purposes, and I still made a censored version for other IP's that are not the local host. Overall I think this went great I spent around 1.5 hours setting this up, with the help of claude for coding. Prompting this and testing the results out is really fun and with all of this I am also learning new things because I tell claude to explain me everything it changes.
