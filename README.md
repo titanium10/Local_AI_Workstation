@@ -202,3 +202,20 @@ The main reason I actually added voice to voice was so that I can just speak lon
 ## Log: 6/22/26 — adding new quality of life features to help the user and make it more like other ai ui.
 ### Overview
 I added 20 quality of life features to the chat and the website ui. These features were: Code copy button, Chat search, ... menu on the chat where you can rename. pin. export. and .delete, Timestamps, chat exporting, character counter, a new developed welcome screen with 6 prompts, scroll to bottom button, edit last message button, ai chat naming, persona, typing indicator, message counter, image fullscreen, stop generating button, retry message button, token counter, new keyboard shortcuts, sound effect when the ai is done generating, ai's active status on the app ui.
+### Problem Solved
+* there wasn't a way to find all chats without scrolling through the entire thing so I added a chat search bar.
+* App,py had one main system prompt which would not have been accurate for many different problems, so added a persona field in the settings so users can add a main system prompt.
+* code and messages couldnt be copied without highlighting the entire passage so added a copy text button.
+* I couldnt know when ollama was active without checking the app.py stats page, so I moved a small green and red light indicator to show when ollama is active.
+* the chat sidebar only showed the name of the conversation and a delete button, so I added new features like message count, and message pin.
+* when you opened a new conversation there was a blank page with a text box, so I added a welcome screen with a few prompts to make the conversation look active.
+* There wasn't a way to mess with chats apart from deleting them, so I added pining, renaming, exporting, and deleting.
+* There wasn't a way to tell how many tokens the entire conversation was and when it was coming to an end because the model has a small token context, so I added a estimated token counter at the top right so see how long the chat is.
+* There wasn't any timestamps on messages, so I added a timestamp under every message.
+### Decisions
+* The ai title selection is made right after the first responce so it doesn't affect the performance and gives better titles with barely and speed cost.
+* Persona is capped at 1000 characters to prevent bloating and missbeheaving.
+* the token counter uses a equation of 1 token = 4 characters, which gives an estimate of how many tokens are there in a chat.
+* sound affect is from web audio API, to generate a ping after generation.
+### Personal comments
+It has been a long time since I made any changes to the app but I have used it a lot, I had come to india for vacation and couldnt find time, and I am planning to buy a seperate gpu with more vram so I can add more features and a better model and try out fine tuning. Overall this project today was easy I did require manually checking all the problems from testers and spent a hour testing if those problems were true and finding other problems I wanted to solve by comparing them to another ai ui like claude and gemini. Doing this was really fun because I did try to find loopholes and try to jailbrake the ai for a few minutes, and I will be fixing those in the future projects.
