@@ -40,18 +40,90 @@
   .settings-btn:hover { color: var(--accent); background: var(--accent-glow); }
   .new-chat-btn { margin-top: 0.5rem; background: var(--accent-glow); border: 1px solid var(--accent2); color: var(--accent); padding: 9px 14px; border-radius: 8px; font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
   .new-chat-btn:hover { background: rgba(127,119,221,0.25); }
+
+  /* NEW FEATURE 2: Chat search bar */
+  .chat-search {
+    margin-top: 0.5rem;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s;
+  }
+  .chat-search:focus { border-color: var(--accent); }
+  .chat-search::placeholder { color: var(--text2); }
+
   .chat-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin-top: 0.5rem; }
   .chat-list::-webkit-scrollbar { width: 3px; }
   .chat-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
-  .chat-item { display: flex; align-items: center; gap: 6px; border-radius: 7px; padding: 2px; transition: background 0.15s; }
+  .chat-item { display: flex; align-items: center; gap: 4px; border-radius: 7px; padding: 2px; transition: background 0.15s; position: relative; }
   .chat-item:hover { background: var(--bg3); }
   .chat-item.active { background: var(--accent-glow); }
-  .chat-item-btn { flex: 1; background: none; border: none; color: var(--text2); font-family: 'Syne', sans-serif; font-size: 12.5px; text-align: left; padding: 7px 8px; cursor: pointer; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.15s; }
+  .chat-item-btn { flex: 1; background: none; border: none; color: var(--text2); font-family: 'Syne', sans-serif; font-size: 12.5px; text-align: left; padding: 7px 8px; cursor: pointer; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.15s; display: flex; align-items: center; gap: 6px; }
   .chat-item.active .chat-item-btn { color: var(--text); }
-  .del-btn { background: none; border: none; color: var(--text2); cursor: pointer; padding: 4px 6px; border-radius: 5px; font-size: 13px; opacity: 0; transition: opacity 0.15s, color 0.15s; flex-shrink: 0; }
-  .chat-item:hover .del-btn { opacity: 1; }
-  .chat-item .del-btn { opacity: 0.5; } /* always slightly visible on mobile */
-  .del-btn:hover { color: #e24b4a; }
+
+  /* NEW FEATURE 13: Message count badge */
+  .msg-count-badge {
+    background: var(--bg3);
+    color: var(--text2);
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .chat-item.active .msg-count-badge { background: var(--accent-glow); color: var(--accent); }
+
+  /* NEW FEATURE 3: pin icon shown next to pinned chats */
+  .pin-icon {
+    color: var(--accent);
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  /* NEW FEATURE 3: "..." menu button + dropdown */
+  .menu-btn {
+    background: none; border: none;
+    color: var(--text2); cursor: pointer;
+    padding: 4px 6px; border-radius: 5px;
+    font-size: 14px; flex-shrink: 0;
+    opacity: 0; transition: opacity 0.15s, color 0.15s;
+  }
+  .chat-item:hover .menu-btn { opacity: 1; }
+  .chat-item .menu-btn { opacity: 0.4; }  /* always slightly visible on mobile */
+  .menu-btn:hover { color: var(--accent); background: var(--bg3); }
+
+  .ctx-menu {
+    position: absolute;
+    top: 100%; right: 8px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    z-index: 200;
+    padding: 4px;
+    min-width: 140px;
+    display: none;
+    animation: msgIn 0.15s ease forwards;
+  }
+  .ctx-menu.open { display: block; }
+  .ctx-menu-item {
+    display: block; width: 100%;
+    background: none; border: none;
+    color: var(--text); cursor: pointer;
+    padding: 8px 12px; border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; text-align: left;
+    transition: background 0.15s;
+  }
+  .ctx-menu-item:hover { background: var(--accent-glow); color: var(--accent); }
+  .ctx-menu-item.danger:hover { background: rgba(226,75,74,0.15); color: #e24b4a; }
 
   /* Mobile overlay */
   .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 40; }
@@ -66,7 +138,7 @@
   .mobile-settings-btn { background: none; border: none; color: var(--text2); cursor: pointer; font-size: 16px; padding: 4px; }
 
   /* Settings panel */
-  .settings-panel { display: none; position: fixed; top: 0; right: 0; width: 280px; height: 100vh; background: var(--bg2); border-left: 1px solid var(--border2); z-index: 100; padding: 1.5rem; flex-direction: column; gap: 1.5rem; box-shadow: -4px 0 24px rgba(0,0,0,0.3); }
+  .settings-panel { display: none; position: fixed; top: 0; right: 0; width: 320px; height: 100vh; background: var(--bg2); border-left: 1px solid var(--border2); z-index: 100; padding: 1.5rem; flex-direction: column; gap: 1.5rem; box-shadow: -4px 0 24px rgba(0,0,0,0.3); overflow-y: auto; }
   .settings-panel.open { display: flex; }
   .settings-header { display: flex; align-items: center; justify-content: space-between; }
   .settings-header h2 { font-size: 15px; font-weight: 700; color: var(--text); }
@@ -82,32 +154,167 @@
   input:checked + .toggle-slider { background: var(--accent); border-color: var(--accent2); }
   input:checked + .toggle-slider:before { transform: translateX(18px); background: white; }
 
+  /* NEW FEATURE 11: Persona textarea */
+  .persona-textarea {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 10px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    resize: vertical;
+    min-height: 80px;
+    max-height: 200px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .persona-textarea:focus { border-color: var(--accent); }
+
   /* Main */
-  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-  .chat-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text2); font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 10px; }
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; position: relative; }
+  .chat-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text2); font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .chat-header .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); flex-shrink: 0; }
-  .messages { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; -webkit-overflow-scrolling: touch; }
+
+  /* NEW FEATURE 17: Token counter + FEATURE 20: connection status */
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text2);
+  }
+  .token-counter {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg3);
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .conn-status { display: flex; align-items: center; gap: 5px; }
+  .conn-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #888;
+    transition: background 0.3s;
+  }
+  .conn-dot.online { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+  .conn-dot.offline { background: #e24b4a; box-shadow: 0 0 6px #e24b4a; }
+
+  /* NEW FEATURE 5: Export button in header */
+  .header-action-btn {
+    background: none; border: 1px solid var(--border2);
+    color: var(--text2); cursor: pointer;
+    padding: 4px 8px; border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; transition: all 0.2s;
+  }
+  .header-action-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+
+  .messages { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 1rem; -webkit-overflow-scrolling: touch; position: relative; }
   .messages::-webkit-scrollbar { width: 4px; }
   .messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* NEW FEATURE 8: Scroll to bottom button */
+  .scroll-bottom-btn {
+    position: absolute;
+    bottom: 90px;
+    right: 24px;
+    background: var(--accent);
+    border: none;
+    color: white;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 20;
+    transition: transform 0.2s;
+  }
+  .scroll-bottom-btn.visible { display: flex; }
+  .scroll-bottom-btn:hover { transform: scale(1.1); background: var(--accent2); }
+
   .msg { display: flex; gap: 8px; max-width: 820px; width: 100%; }
   .msg.user { align-self: flex-end; flex-direction: row-reverse; }
   .avatar { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; }
   .avatar.ai { background: var(--accent-glow); border: 1px solid var(--accent2); color: var(--accent); }
   .avatar.user-av { background: var(--bg3); border: 1px solid var(--border2); color: var(--text2); }
-  .bubble { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; font-size: 14px; line-height: 1.7; color: var(--text); font-family: 'JetBrains Mono', monospace; max-width: calc(100% - 36px); word-break: break-word; }
+
+  /* NEW: wrapper around bubble to allow timestamp + action buttons below */
+  .bubble-wrap { display: flex; flex-direction: column; max-width: calc(100% - 36px); gap: 4px; }
+  .msg.user .bubble-wrap { align-items: flex-end; }
+
+  .bubble { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; font-size: 14px; line-height: 1.7; color: var(--text); font-family: 'JetBrains Mono', monospace; word-break: break-word; }
   .msg.user .bubble { background: var(--bg3); border-color: var(--border2); }
   .bubble strong { color: var(--accent); font-weight: 500; }
   .bubble code { background: rgba(192,20,60,0.12); color: #ff8899; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
-  .bubble pre { background: #0d0d14; border: 1px solid var(--border2); border-radius: 8px; padding: 10px; margin: 8px 0; overflow-x: auto; font-size: 12px; line-height: 1.6; }
 
-  /* image preview inside a chat bubble — like Claude/Gemini */
-  /* max-width: 100% stops the image overflowing the bubble */
-  /* max-height: 300px keeps tall images from taking over the screen */
-  /* border-radius matches the bubble style */
-  .bubble-image { max-width: 100%; max-height: 300px; border-radius: 8px; display: block; margin-bottom: 6px; border: 1px solid var(--border2); }
+  /* NEW FEATURE 1: code block with copy button */
+  .code-block-wrap { position: relative; margin: 8px 0; }
+  .code-block-wrap pre { background: #0d0d14; border: 1px solid var(--border2); border-radius: 8px; padding: 10px; padding-top: 28px; overflow-x: auto; font-size: 12px; line-height: 1.6; }
+  .code-copy-btn {
+    position: absolute;
+    top: 6px; right: 6px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    z-index: 5;
+  }
+  .code-copy-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .code-copy-btn.copied { color: #2ecc71; border-color: #2ecc71; }
 
-  /* pending image preview — shown in the input area before sending */
-  /* this is the small thumbnail that appears when you pick a file */
+  /* NEW FEATURE 4: Message timestamp */
+  .msg-timestamp {
+    font-size: 10px;
+    color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0.6;
+    padding: 0 4px;
+  }
+
+  /* NEW FEATURES 9 + 16: Action buttons (edit, retry) below message */
+  .msg-actions { display: flex; gap: 4px; padding: 0 4px; opacity: 0; transition: opacity 0.2s; }
+  .msg:hover .msg-actions { opacity: 1; }
+  .msg-action-btn {
+    background: none; border: 1px solid var(--border);
+    color: var(--text2); cursor: pointer;
+    padding: 3px 7px; border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; transition: all 0.2s;
+  }
+  .msg-action-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-glow); }
+
+  .bubble-image { max-width: 100%; max-height: 300px; border-radius: 8px; display: block; margin-bottom: 6px; border: 1px solid var(--border2); cursor: zoom-in; transition: opacity 0.2s; }
+  .bubble-image:hover { opacity: 0.85; }
+
+  /* NEW FEATURE 14: Image fullscreen modal */
+  .image-modal {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.9);
+    z-index: 1000;
+    align-items: center; justify-content: center;
+    cursor: zoom-out;
+    padding: 20px;
+  }
+  .image-modal.open { display: flex; }
+  .image-modal img {
+    max-width: 95%;
+    max-height: 95%;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+
   .pending-image-wrap { position: relative; display: inline-block; margin-bottom: 6px; }
   .pending-image-preview { max-height: 80px; max-width: 120px; border-radius: 8px; border: 1px solid var(--accent2); display: block; }
   .pending-image-remove { position: absolute; top: -6px; right: -6px; background: #e24b4a; border: none; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
@@ -118,48 +325,86 @@
   .thinking-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text2); animation: pulse 1.5s ease-in-out infinite; }
   @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
 
-  /* ── Animations ── */
-  /* Fade + slide up for new messages appearing */
+  /* NEW FEATURE 7: Empty state / welcome screen */
+  .welcome-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    gap: 1.5rem;
+  }
+  .welcome-logo {
+    font-size: 48px;
+    color: var(--accent);
+    animation: glowPulse 2.5s ease-in-out infinite;
+  }
+  .welcome-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .welcome-title span { color: var(--accent); }
+  .welcome-subtitle {
+    font-size: 13px;
+    color: var(--text2);
+    font-family: 'JetBrains Mono', monospace;
+    max-width: 400px;
+    line-height: 1.6;
+  }
+  .suggested-prompts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+    max-width: 600px;
+    width: 100%;
+    margin-top: 1rem;
+  }
+  .suggested-prompt {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 14px;
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .suggested-prompt:hover {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+    transform: translateY(-2px);
+  }
+  .suggested-prompt-icon { font-size: 18px; display: block; margin-bottom: 6px; }
+
+  /* Animations */
   @keyframes msgIn { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform: translateY(0); } }
   .msg { animation: msgIn 0.25s ease forwards; }
-
-  /* Glow pulse on the accent dot in header */
   @keyframes glowPulse { 0%,100% { box-shadow: 0 0 6px var(--accent); } 50% { box-shadow: 0 0 16px var(--accent-bright), 0 0 32px var(--accent); } }
   .chat-header .dot { animation: glowPulse 2.5s ease-in-out infinite; }
-
-  /* Shimmer on the sidebar title */
   @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
   .sidebar-title-left { background: linear-gradient(90deg, var(--text) 30%, var(--accent-bright) 50%, var(--text) 70%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; animation: shimmer 4s linear infinite; }
-  /* Make the AI span inside use same animation naturally */
-
-  /* Slide in from right for settings panel */
   @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
   .settings-panel.open { animation: slideInRight 0.25s ease forwards; }
-
-  /* Ripple effect on send button click */
   @keyframes ripple { 0% { transform: scale(0); opacity: 0.6; } 100% { transform: scale(2.5); opacity: 0; } }
   .send-btn::after { content: ''; position: absolute; width: 100%; height: 100%; border-radius: 10px; background: rgba(255,255,255,0.3); transform: scale(0); pointer-events: none; }
   .send-btn { position: relative; overflow: hidden; }
   .send-btn:active::after { animation: ripple 0.4s ease; }
-
-  /* Subtle scanline texture overlay on the whole app for depth */
   .app::before { content: ''; position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px); pointer-events: none; z-index: 999; }
 
-  /* Voice button */
+  /* Voice + settings inputs */
   .voice-btn { background: none; border: 1px solid var(--border2); color: var(--text2); width: 44px; height: 44px; border-radius: 10px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
   .voice-btn:hover { border-color: var(--accent2); color: var(--accent); background: var(--accent-glow); }
   .voice-btn.recording { border-color: var(--accent-bright); color: var(--accent-bright); background: var(--accent-glow); animation: glowPulse 1s ease-in-out infinite; }
-
-  /* Settings slider */
   .settings-slider { width: 100%; accent-color: var(--accent); }
   .settings-select { width: 100%; background: var(--bg3); border: 1px solid var(--border2); color: var(--text); padding: 7px 10px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; outline: none; cursor: pointer; }
   .settings-select:focus { border-color: var(--accent2); }
   .settings-select option { background: var(--bg2); }
-
-  /* Animated border on textarea focus */
   textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
-
-  /* New chat button hover shimmer */
   .new-chat-btn { background: linear-gradient(135deg, var(--accent-glow), rgba(192,20,60,0.08)); }
   .new-chat-btn:hover { background: linear-gradient(135deg, rgba(192,20,60,0.25), rgba(192,20,60,0.12)); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(192,20,60,0.2); }
   .new-chat-btn { transition: all 0.2s; }
@@ -176,17 +421,27 @@
   .stop-btn { background: #e24b4a; border: none; color: white; width: 44px; height: 44px; border-radius: 10px; cursor: pointer; font-size: 16px; display: none; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
   .stop-btn:hover { background: #c73b3a; transform: scale(1.05); }
   .stop-btn.visible { display: flex; }
-
-  /* paperclip upload button — sits next to the textarea */
   .upload-btn { background: none; border: 1px solid var(--border2); color: var(--text2); width: 44px; height: 44px; border-radius: 10px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
   .upload-btn:hover { border-color: var(--accent2); color: var(--accent); background: var(--accent-glow); }
-
-  /* doc indicator — shows filename of uploaded file above input row */
-  /* hidden by default, only shown when a file is uploaded */
   .doc-indicator { display: none; align-items: center; gap: 8px; padding: 5px 10px; background: var(--accent-glow); border: 1px solid var(--accent2); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); }
   .doc-indicator.visible { display: flex; }
   .doc-indicator-remove { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 14px; padding: 0 2px; opacity: 0.7; }
   .doc-indicator-remove:hover { opacity: 1; }
+
+  /* NEW FEATURE 6: Character counter */
+  .input-meta {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text2);
+    padding: 0 4px;
+    opacity: 0.7;
+  }
+  .char-counter { transition: color 0.2s; }
+  .char-counter.warning { color: #e2a04b; }
+  .char-counter.danger { color: #e24b4a; }
+  .keyboard-hint { opacity: 0.5; }
 
   /* Emoji */
   .emoji-bar { display: flex; align-items: center; gap: 3px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
@@ -199,42 +454,37 @@
   .emoji-more { display: none; }
   .emoji-more.open { display: flex; flex-wrap: wrap; gap: 3px; padding-top: 4px; }
 
-  /* ── Mobile ── */
+  /* Mobile */
   @media (max-width: 640px) {
-    .sidebar {
-      position: fixed; top: 0; left: 0;
-      height: 100vh; height: 100dvh;
-      transform: translateX(-100%);
-      box-shadow: 4px 0 24px rgba(0,0,0,0.4);
-    }
+    .sidebar { position: fixed; top: 0; left: 0; height: 100vh; height: 100dvh; transform: translateX(-100%); box-shadow: 4px 0 24px rgba(0,0,0,0.4); }
     .sidebar.open { transform: translateX(0); }
     .chat-header { display: none; }
     .mobile-header { display: flex; }
-    .del-btn { opacity: 0.6 !important; }
+    .menu-btn { opacity: 0.6 !important; }
     .bubble { font-size: 13px; }
     .messages { padding: 0.75rem; }
+    .settings-panel { width: 100%; }
+    .msg-actions { opacity: 1; }
   }
 </style>
 </head>
 <body>
 <div class="app">
 
-  <!-- Sidebar overlay (mobile) -->
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
-  <!-- Sidebar -->
   <div class="sidebar" id="sidebar">
     <div class="sidebar-title">
       <div class="sidebar-title-left">⬡ Samrat's <span>AI</span></div>
       <button class="settings-btn" onclick="toggleSettings()" title="Settings">⚙️</button>
     </div>
     <button class="new-chat-btn" onclick="newChat()">＋ New conversation</button>
+    <!-- NEW FEATURE 2: search bar -->
+    <input type="text" class="chat-search" id="chatSearch" placeholder="🔍 Search chats... (Ctrl+K)" oninput="filterChats()">
     <div class="chat-list" id="chatList"></div>
   </div>
 
-  <!-- Main -->
   <div class="main">
-    <!-- Mobile header -->
     <div class="mobile-header">
       <button class="hamburger" onclick="openSidebar()">☰</button>
       <div class="mobile-header-title">⬡ Samrat's <span>AI</span></div>
@@ -244,13 +494,26 @@
       </div>
     </div>
 
-    <!-- Desktop header -->
     <div class="chat-header">
       <div class="dot"></div>
       <span id="chatTitle">Select a conversation</span>
+      <div class="header-right">
+        <!-- NEW FEATURE 17: token counter -->
+        <div class="token-counter" id="tokenCounter" title="Approximate token count in current chat context">~0 tok</div>
+        <!-- NEW FEATURE 5: export button -->
+        <button class="header-action-btn" id="exportBtn" onclick="exportChat()" title="Export as Markdown">⬇ Export</button>
+        <!-- NEW FEATURE 20: connection status -->
+        <div class="conn-status" title="Ollama connection status">
+          <div class="conn-dot" id="connDot"></div>
+          <span id="connText">checking...</span>
+        </div>
+      </div>
     </div>
 
     <div class="messages" id="messages"></div>
+
+    <!-- NEW FEATURE 8: scroll to bottom button -->
+    <button class="scroll-bottom-btn" id="scrollBottomBtn" onclick="scrollBottom(true)" title="Scroll to bottom">↓</button>
 
     <div class="input-area">
       <div class="emoji-bar">
@@ -287,42 +550,40 @@
         <button class="emoji-btn" onclick="insertEmoji('⚡')">⚡</button>
         <button class="emoji-btn" onclick="insertEmoji('🌙')">🌙</button>
       </div>
-      <!-- pending image preview: thumbnail shown before user sends message -->
-      <!-- hidden by default, shown when an image is selected/pasted -->
+
       <div id="pendingImageWrap" style="display:none; padding: 4px 0;">
         <div class="pending-image-wrap">
           <img id="pendingImagePreview" class="pending-image-preview" src="" alt="pending">
-          <!-- the X button calls cancelPendingImage() to discard the selection -->
           <button class="pending-image-remove" onclick="cancelPendingImage()">✕</button>
         </div>
       </div>
 
-      <!-- doc indicator: shown above input row when a file is uploaded -->
-      <!-- invisible by default, JS adds "visible" class after upload -->
       <div class="doc-indicator" id="docIndicator">
         <span id="docIndicatorText">📄 filename.pdf</span>
         <button class="doc-indicator-remove" onclick="removeDoc()" title="Remove document">✕</button>
       </div>
 
       <div class="input-row">
-        <!-- hidden file input — the paperclip button triggers this -->
-        <!-- accept tells the browser which file types to show in the picker -->
-        <input type="file" id="fileInput" style="display:none"
-               accept=".pdf,.png,.jpg,.jpeg,.gif,.webp"
-               onchange="handleFileUpload(this)">
-
-        <!-- paperclip button — clicking it opens the file picker above -->
+        <input type="file" id="fileInput" style="display:none" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp" onchange="handleFileUpload(this)">
         <button class="upload-btn" onclick="document.getElementById('fileInput').click()" title="Upload PDF or image">📎</button>
-
-        <!-- voice button — click to start recording, click again to stop -->
         <button class="voice-btn" id="voiceBtn" onclick="toggleVoice()" title="Voice input">🎙️</button>
-
-        <textarea id="input" placeholder="Ask anything..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <textarea id="input" placeholder="Ask anything..." rows="1" onkeydown="handleKey(event)" oninput="autoResize(this); updateCharCounter()"></textarea>
         <button class="send-btn" id="sendBtn" onclick="sendMessage()">↑</button>
         <button class="stop-btn" id="stopBtn" onclick="stopGeneration()" title="Stop">■</button>
       </div>
+
+      <!-- NEW FEATURE 6: char counter + keyboard hint -->
+      <div class="input-meta">
+        <span class="char-counter" id="charCounter">0 chars</span>
+        <span class="keyboard-hint">Enter to send • Shift+Enter for new line • Ctrl+N for new chat</span>
+      </div>
     </div>
   </div>
+</div>
+
+<!-- NEW FEATURE 14: Image fullscreen modal -->
+<div class="image-modal" id="imageModal" onclick="closeImageModal()">
+  <img id="modalImage" src="" alt="">
 </div>
 
 <!-- Settings Panel -->
@@ -331,7 +592,7 @@
     <h2>⚙️ Settings</h2>
     <button class="close-settings" onclick="toggleSettings()">✕</button>
   </div>
-  <!-- Appearance -->
+
   <div class="settings-section">
     <div class="settings-label">Appearance</div>
     <div class="toggle-row">
@@ -343,7 +604,32 @@
     </div>
   </div>
 
-  <!-- Voice settings -->
+  <!-- NEW FEATURE 11: Persona / "About me" -->
+  <div class="settings-section">
+    <div class="settings-label">About You (Persona)</div>
+    <div style="font-size:11px; color:var(--text2); font-family:'JetBrains Mono',monospace; line-height:1.5;">
+      Tell the AI who you are. It'll use this in every chat — name, age, interests, goals, anything.
+    </div>
+    <textarea
+      class="persona-textarea"
+      id="personaInput"
+      placeholder="Example: My name is Samrat. I'm 14, building a local AI chat app, learning neural networks. Reply concisely."
+      oninput="savePersona()"
+    ></textarea>
+  </div>
+
+  <!-- NEW FEATURE 19: Sound effect toggle -->
+  <div class="settings-section">
+    <div class="settings-label">Sound</div>
+    <div class="toggle-row">
+      <span>Ping on completion</span>
+      <label class="toggle">
+        <input type="checkbox" id="soundToggle" onchange="saveAISettings()">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  </div>
+
   <div class="settings-section">
     <div class="settings-label">Voice</div>
     <div class="toggle-row">
@@ -367,7 +653,6 @@
     </div>
   </div>
 
-  <!-- AI settings -->
   <div class="settings-section">
     <div class="settings-label">AI Behaviour</div>
     <div class="toggle-row">
@@ -384,11 +669,10 @@
     </div>
   </div>
 
-  <!-- Info -->
   <div class="settings-section" style="margin-top:auto;">
     <div class="settings-label">About</div>
     <div style="font-size:11px; color:var(--text2); font-family:'JetBrains Mono',monospace; line-height:1.8;">
-      <div>Samrat's AI v2.0</div>
+      <div>Samrat's AI v3.0</div>
       <div>Model: Llama3 + llava</div>
       <div>Running 100% locally</div>
       <div style="margin-top:6px;"><a href="/stats" target="_blank" style="color:var(--accent); text-decoration:none;">📊 View stats dashboard</a></div>
@@ -397,19 +681,28 @@
 </div>
 
 <script>
+// ── Global state ─────────────────────────────────────────────────────────
 let currentChatId = null;
 let isThinking = false;
 let thinkingFrame = null;
 let currentXhr = null;
 let userScrolled = false;
-let currentAudio = null; // tracks the currently playing TTS audio so we can stop it // tracks if user manually scrolled up during generation
+let currentAudio = null;
+let allChats = [];          // cached list for search filtering
+let openMenuId = null;      // which "..." menu is currently open
 
-// --- Scroll detection ---
+// --- Scroll detection (now also for FEATURE 8: scroll-to-bottom button) ---
 document.getElementById('messages').addEventListener('scroll', function() {
-  if (!isThinking) return;
   const el = this;
   const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-  userScrolled = !atBottom;
+  if (isThinking) userScrolled = !atBottom;
+  // Show/hide the scroll-to-bottom button
+  const btn = document.getElementById('scrollBottomBtn');
+  if (!atBottom && el.scrollHeight > el.clientHeight + 100) {
+    btn.classList.add('visible');
+  } else {
+    btn.classList.remove('visible');
+  }
 });
 
 // --- Mobile sidebar ---
@@ -437,7 +730,6 @@ function toggleLightMode(checkbox) {
 }
 if (localStorage.getItem('theme') === 'light') {
   document.documentElement.classList.add('light');
-  document.getElementById('lightModeToggle').checked = true;
 }
 
 // --- Emoji ---
@@ -448,6 +740,7 @@ function insertEmoji(emoji) {
   input.selectionStart = input.selectionEnd = pos + emoji.length;
   input.focus();
   autoResize(input);
+  updateCharCounter();
 }
 function toggleMoreEmoji() {
   document.getElementById('emojiMore').classList.toggle('open');
@@ -458,7 +751,7 @@ function stopGeneration() {
   if (currentXhr) { currentXhr.abort(); currentXhr = null; }
 }
 
-// --- Thinking animation ---
+// --- Thinking animation (unchanged) ---
 function createThinkingEl() {
   const wrap = document.createElement('div');
   wrap.className = 'thinking-wrap'; wrap.id = 'thinkingEl';
@@ -511,18 +804,76 @@ function removeThinking() {
   if (te) te.remove();
 }
 
-// --- Chat API ---
+// ── FEATURE 7: WELCOME / EMPTY STATE ─────────────────────────────────────
+const SUGGESTED_PROMPTS = [
+  { icon: '🧠', text: 'Explain a tricky concept', prompt: 'Explain how neural networks learn from data, in simple terms' },
+  { icon: '📝', text: 'Help me write something', prompt: 'Help me write an email to a teacher explaining I need an extension' },
+  { icon: '💻', text: 'Debug some code', prompt: 'Help me find bugs in this code:\n\n' },
+  { icon: '📚', text: 'Homework help', prompt: 'Help me understand this topic: ' },
+  { icon: '🎮', text: 'Just chat', prompt: 'What\'s something interesting I should learn about today?' },
+  { icon: '🔍', text: 'Look something up', prompt: 'What is ' }
+];
+
+function renderWelcomeScreen() {
+  const container = document.getElementById('messages');
+  container.innerHTML = '';
+  const welcome = document.createElement('div');
+  welcome.className = 'welcome-screen';
+  welcome.innerHTML = `
+    <div class="welcome-logo">⬡</div>
+    <div class="welcome-title">Welcome to Samrat's <span>AI</span></div>
+    <div class="welcome-subtitle">A private AI running entirely on local hardware. Nothing leaves the device.</div>
+    <div class="suggested-prompts" id="suggestedPrompts"></div>
+  `;
+  container.appendChild(welcome);
+  const promptsEl = welcome.querySelector('#suggestedPrompts');
+  SUGGESTED_PROMPTS.forEach(sp => {
+    const btn = document.createElement('button');
+    btn.className = 'suggested-prompt';
+    btn.innerHTML = `<span class="suggested-prompt-icon">${sp.icon}</span>${sp.text}`;
+    btn.onclick = () => {
+      const input = document.getElementById('input');
+      input.value = sp.prompt;
+      input.focus();
+      autoResize(input);
+      updateCharCounter();
+    };
+    promptsEl.appendChild(btn);
+  });
+}
+
+// ── FEATURE 2: SEARCH FILTERING ──────────────────────────────────────────
+function filterChats() {
+  const q = document.getElementById('chatSearch').value.toLowerCase().trim();
+  if (!q) {
+    renderChatList(allChats);
+    return;
+  }
+  const filtered = allChats.filter(c => c.name.toLowerCase().includes(q));
+  renderChatList(filtered);
+}
+
+// ── Chat API ─────────────────────────────────────────────────────────────
 async function loadChats() {
   const res = await fetch('/api/chats');
   const chats = await res.json();
-  renderChatList(chats);
-  if (chats.length === 0) {
-    const c = await createChatAPI();
-    selectChat(c.id, 'New Conversation');
-  } else if (!currentChatId) {
+  allChats = chats;
+  // If a search is active, keep filtering. Otherwise render full list.
+  const searchVal = document.getElementById('chatSearch').value.trim();
+  if (searchVal) {
+    filterChats();
+  } else {
+    renderChatList(chats);
+  }
+  // If no chats exist AND no current chat selected, show welcome
+  if (chats.length === 0 && !currentChatId) {
+    document.getElementById('chatTitle').textContent = 'Welcome';
+    renderWelcomeScreen();
+  } else if (!currentChatId && chats.length > 0) {
     selectChat(chats[0].id, chats[0].name);
   }
 }
+
 async function createChatAPI() {
   const res = await fetch('/api/chats', {
     method: 'POST', headers: {'Content-Type':'application/json'},
@@ -530,104 +881,413 @@ async function createChatAPI() {
   });
   return res.json();
 }
+
 function renderChatList(chats) {
   const list = document.getElementById('chatList');
   list.innerHTML = '';
   chats.forEach(c => {
     const item = document.createElement('div');
     item.className = 'chat-item' + (c.id === currentChatId ? ' active' : '');
+
+    // Pin icon if pinned
+    const pinIcon = c.pinned ? '<span class="pin-icon">📌</span>' : '';
+
+    // Escape single quotes and HTML in chat name for safe insertion
+    const safeName = c.name.replace(/'/g, "\\'").replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // Message count badge (only if > 0)
+    const badge = c.msg_count ? `<span class="msg-count-badge">${c.msg_count}</span>` : '';
+
     item.innerHTML = `
-      <button class="chat-item-btn" onclick="selectChat('${c.id}','${c.name.replace(/'/g,"\\'")}');closeSidebar()">
-        ${c.name}
+      <button class="chat-item-btn" onclick="selectChat('${c.id}','${safeName}');closeSidebar()">
+        ${pinIcon}<span style="overflow:hidden;text-overflow:ellipsis;">${c.name}</span>${badge}
       </button>
-      <button class="del-btn" onclick="deleteChat('${c.id}')">✕</button>
+      <button class="menu-btn" onclick="toggleCtxMenu(event, '${c.id}')" title="Options">⋯</button>
+      <div class="ctx-menu" id="ctxMenu-${c.id}">
+        <button class="ctx-menu-item" onclick="renameChat('${c.id}','${safeName}')">✏️ Rename</button>
+        <button class="ctx-menu-item" onclick="togglePin('${c.id}', ${c.pinned ? 'true' : 'false'})">${c.pinned ? '📌 Unpin' : '📌 Pin'}</button>
+        <button class="ctx-menu-item" onclick="exportChatById('${c.id}')">⬇️ Export</button>
+        <button class="ctx-menu-item danger" onclick="deleteChat('${c.id}')">🗑️ Delete</button>
+      </div>
     `;
     list.appendChild(item);
   });
 }
+
+// ── FEATURE 3: Context menu (rename, pin, delete, export) ────────────────
+function toggleCtxMenu(e, chatId) {
+  e.stopPropagation();
+  // Close any other open menus first
+  document.querySelectorAll('.ctx-menu.open').forEach(m => {
+    if (m.id !== 'ctxMenu-' + chatId) m.classList.remove('open');
+  });
+  const menu = document.getElementById('ctxMenu-' + chatId);
+  if (menu) menu.classList.toggle('open');
+  openMenuId = menu && menu.classList.contains('open') ? chatId : null;
+}
+
+// Close menus when clicking elsewhere
+document.addEventListener('click', () => {
+  document.querySelectorAll('.ctx-menu.open').forEach(m => m.classList.remove('open'));
+  openMenuId = null;
+});
+
+async function renameChat(chatId, currentName) {
+  const newName = prompt('Rename conversation:', currentName);
+  if (!newName || !newName.trim()) return;
+  await fetch('/api/chats/' + chatId, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({name: newName.trim()})
+  });
+  if (chatId === currentChatId) {
+    document.getElementById('chatTitle').textContent = newName.trim();
+  }
+  loadChats();
+}
+
+async function togglePin(chatId, isPinned) {
+  await fetch('/api/chats/' + chatId, {
+    method: 'PATCH',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({pinned: !isPinned})
+  });
+  loadChats();
+}
+
+// ── FEATURE 5: Chat export ───────────────────────────────────────────────
+function exportChat() {
+  if (!currentChatId) return;
+  exportChatById(currentChatId);
+}
+function exportChatById(chatId) {
+  // Just navigate to the URL — the browser will download the .md file
+  // because the response has Content-Disposition: attachment
+  window.location.href = '/api/chats/' + chatId + '/export';
+}
+
 async function selectChat(id, name) {
-  stopAudio(); // stop any playing TTS when user switches to a different chat
+  stopAudio();
   currentChatId = id;
   document.getElementById('chatTitle').textContent = name;
   const res = await fetch(`/api/chats/${id}/messages`);
   const msgs = await res.json();
   renderMessages(msgs);
 
-  // NEW: fetch chat details to check if it has a doc uploaded
-  // We call /api/chats to get all chats, then find this one
   const chatsRes = await fetch('/api/chats');
   const chats = await chatsRes.json();
   const thisChat = chats.find(c => c.id === id);
-  // .find() loops through the array and returns the first item where c.id === id
   if (thisChat) updateDocIndicator(thisChat);
 
   loadChats();
 }
+
 async function newChat() {
-  stopAudio(); // stop any playing TTS when user starts a new chat
+  stopAudio();
   const c = await createChatAPI();
   currentChatId = c.id;
   document.getElementById('chatTitle').textContent = 'New Conversation';
   document.getElementById('messages').innerHTML = '';
+  // Show welcome screen for fresh empty chat
+  renderWelcomeScreen();
+  updateTokenCounter([]);
   closeSidebar();
   loadChats();
 }
+
 async function deleteChat(id) {
-  stopAudio(); // stop any playing TTS when user deletes a chat
+  if (!confirm('Delete this conversation? This cannot be undone.')) return;
+  stopAudio();
   await fetch(`/api/chats/${id}`, {method: 'DELETE'});
   if (currentChatId === id) {
     currentChatId = null;
     document.getElementById('messages').innerHTML = '';
+    document.getElementById('chatTitle').textContent = 'Select a conversation';
+    updateTokenCounter([]);
   }
   loadChats();
 }
+
 function renderMessages(msgs) {
   const container = document.getElementById('messages');
   container.innerHTML = '';
-  msgs.forEach(m => appendMessage(m.role, m.content));
+  if (msgs.length === 0) {
+    renderWelcomeScreen();
+    updateTokenCounter([]);
+    return;
+  }
+  msgs.forEach((m, idx) => {
+    const isLast = idx === msgs.length - 1;
+    const isLastAi = m.role === 'assistant' && isLast;
+    appendMessage(m.role, m.content, m.id, m.created_at, isLastAi);
+  });
+  updateTokenCounter(msgs);
   scrollBottom();
 }
-function appendMessage(role, content) {
+
+// ── FEATURE 4 + 9 + 16: Message rendering with timestamp + edit/retry ────
+function appendMessage(role, content, msgId, createdAt, showRetry) {
   const container = document.getElementById('messages');
+
+  // Clear welcome screen if it's there
+  const welcome = container.querySelector('.welcome-screen');
+  if (welcome) welcome.remove();
+
   const wrap = document.createElement('div');
   wrap.className = 'msg' + (role === 'user' ? ' user' : '');
+  if (msgId) wrap.dataset.msgId = msgId;
+
   const av = document.createElement('div');
   av.className = 'avatar' + (role === 'user' ? ' user-av' : ' ai');
   av.textContent = role === 'user' ? 'U' : 'AI';
+
+  const bubbleWrap = document.createElement('div');
+  bubbleWrap.className = 'bubble-wrap';
+
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   bubble.innerHTML = formatContent(content);
-  wrap.appendChild(av); wrap.appendChild(bubble);
+
+  bubbleWrap.appendChild(bubble);
+
+  // Timestamp (FEATURE 4)
+  if (createdAt) {
+    const ts = document.createElement('div');
+    ts.className = 'msg-timestamp';
+    ts.textContent = formatTime(createdAt);
+    bubbleWrap.appendChild(ts);
+  }
+
+  // Action buttons (FEATURES 9, 16) — edit for user msgs, retry for AI
+  const actions = document.createElement('div');
+  actions.className = 'msg-actions';
+
+  // Copy button on every message
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'msg-action-btn';
+  copyBtn.textContent = '📋 copy';
+  copyBtn.onclick = () => {
+    navigator.clipboard.writeText(content);
+    copyBtn.textContent = '✓ copied';
+    setTimeout(() => copyBtn.textContent = '📋 copy', 1500);
+  };
+  actions.appendChild(copyBtn);
+
+  if (role === 'user') {
+    const editBtn = document.createElement('button');
+    editBtn.className = 'msg-action-btn';
+    editBtn.textContent = '✏️ edit';
+    editBtn.onclick = () => editMessage(content);
+    actions.appendChild(editBtn);
+  }
+
+  if (showRetry && role === 'assistant') {
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'msg-action-btn';
+    retryBtn.textContent = '🔄 retry';
+    retryBtn.onclick = () => regenerateLastResponse();
+    actions.appendChild(retryBtn);
+  }
+
+  if (actions.children.length > 0) bubbleWrap.appendChild(actions);
+
+  wrap.appendChild(av);
+  wrap.appendChild(bubbleWrap);
   container.appendChild(wrap);
   return bubble;
 }
+
+// Format ISO timestamp as "14:32" or "Yesterday 14:32" or "Mar 15 14:32"
+function formatTime(iso) {
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    const sameDay = d.toDateString() === now.toDateString();
+    if (sameDay) return `${hh}:${mm}`;
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${hh}:${mm}`;
+    return `${d.toLocaleString('default', {month:'short', day:'numeric'})} ${hh}:${mm}`;
+  } catch { return ''; }
+}
+
+// ── FEATURE 1: formatContent now wraps code blocks with copy button ─────
 function formatContent(text) {
-  return text
-    .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+  // First, replace code blocks with placeholders so other regexes don't break them
+  let html = text;
+
+  // Handle triple-backtick code blocks with copy button
+  html = html.replace(/```([\s\S]*?)```/g, (match, code) => {
+    const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    return `<div class="code-block-wrap"><button class="code-copy-btn" onclick="copyCodeBlock(this)">📋 copy</button><pre><code>${escaped}</code></pre></div>`;
+  });
+
+  // Inline code, bold, newlines
+  html = html
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br>');
+
+  return html;
 }
+
+// Code copy handler — finds the <code> inside the wrap and copies its text
+function copyCodeBlock(btn) {
+  const wrap = btn.parentElement;
+  const code = wrap.querySelector('code');
+  if (!code) return;
+  // textContent strips HTML and gives plain text — perfect for clipboard
+  navigator.clipboard.writeText(code.textContent).then(() => {
+    btn.textContent = '✓ copied';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋 copy';
+      btn.classList.remove('copied');
+    }, 1500);
+  });
+}
+
+// ── FEATURE 9: Edit last user message ────────────────────────────────────
+function editMessage(content) {
+  const input = document.getElementById('input');
+  input.value = content;
+  input.focus();
+  autoResize(input);
+  updateCharCounter();
+  // Tell the user what's happening
+  alert('Message loaded into input. Edit it then send — the old version will be replaced.');
+}
+
+// ── FEATURE 16: Regenerate last AI response ──────────────────────────────
+async function regenerateLastResponse() {
+  if (!currentChatId || isThinking) return;
+  // Backend deletes last user msg + last AI msg and returns the user prompt
+  const res = await fetch('/api/chats/' + currentChatId + '/regenerate', {method: 'POST'});
+  const data = await res.json();
+  if (data.last_user_message) {
+    // Reload the chat (now without the last exchange)
+    const msgsRes = await fetch(`/api/chats/${currentChatId}/messages`);
+    const msgs = await msgsRes.json();
+    renderMessages(msgs);
+    // Re-send the prompt
+    doSend(data.last_user_message);
+  }
+}
+
+// ── FEATURE 11: Persona ──────────────────────────────────────────────────
+function savePersona() {
+  localStorage.setItem('persona', document.getElementById('personaInput').value);
+}
+function getPersona() {
+  return localStorage.getItem('persona') || '';
+}
+
+// ── FEATURE 14: Image fullscreen modal ───────────────────────────────────
+function openImageModal(src) {
+  document.getElementById('modalImage').src = src;
+  document.getElementById('imageModal').classList.add('open');
+}
+function closeImageModal() {
+  document.getElementById('imageModal').classList.remove('open');
+  document.getElementById('modalImage').src = '';
+}
+
+// ── FEATURE 6: Character counter ─────────────────────────────────────────
+function updateCharCounter() {
+  const input = document.getElementById('input');
+  const counter = document.getElementById('charCounter');
+  const len = input.value.length;
+  counter.textContent = len + ' chars';
+  counter.classList.remove('warning', 'danger');
+  if (len > 3000) counter.classList.add('danger');
+  else if (len > 1500) counter.classList.add('warning');
+}
+
+// ── FEATURE 17: Token counter ────────────────────────────────────────────
+// Rough estimate: 1 token ≈ 4 characters for English text.
+// Not exact but gives a sense of context size for the user.
+function updateTokenCounter(msgs) {
+  const totalChars = msgs.reduce((sum, m) => sum + (m.content || '').length, 0);
+  const tokens = Math.round(totalChars / 4);
+  const counterEl = document.getElementById('tokenCounter');
+  let display;
+  if (tokens >= 1000) display = '~' + (tokens / 1000).toFixed(1) + 'k tok';
+  else display = '~' + tokens + ' tok';
+  counterEl.textContent = display;
+  // Color code if approaching context window limits
+  // Llama3 has 8k context — warn at 6k, red at 7k
+  if (tokens > 7000) counterEl.style.color = '#e24b4a';
+  else if (tokens > 6000) counterEl.style.color = '#e2a04b';
+  else counterEl.style.color = '';
+}
+
+// ── FEATURE 19: Sound effect on completion ───────────────────────────────
+// Uses Web Audio API to generate a subtle ping — no external file needed.
+function playCompletionSound() {
+  if (!document.getElementById('soundToggle').checked) return;
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    // Two-note ping: high → lower
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.2);
+  } catch (e) {
+    console.warn('Sound effect failed:', e);
+  }
+}
+
+// ── FEATURE 20: Connection status polling ────────────────────────────────
+async function checkConnection() {
+  try {
+    const res = await fetch('/api/ollama-status', {cache: 'no-store'});
+    const data = await res.json();
+    const dot = document.getElementById('connDot');
+    const text = document.getElementById('connText');
+    if (data.online) {
+      dot.classList.add('online');
+      dot.classList.remove('offline');
+      text.textContent = 'Ollama online';
+    } else {
+      dot.classList.add('offline');
+      dot.classList.remove('online');
+      text.textContent = 'Ollama offline';
+    }
+  } catch (e) {
+    const dot = document.getElementById('connDot');
+    dot.classList.add('offline');
+    dot.classList.remove('online');
+    document.getElementById('connText').textContent = 'connection error';
+  }
+}
+// Poll every 10 seconds
+checkConnection();
+setInterval(checkConnection, 10000);
+
+// ── Send Message ─────────────────────────────────────────────────────────
 function sendMessage() {
   const input = document.getElementById('input');
   const prompt = input.value.trim();
-
-  // Allow sending with just an image and no text — like "here's the image"
   if (!prompt && !pendingImageFile) return;
   if (isThinking) return;
 
-  input.value = ''; autoResize(input);
+  input.value = ''; autoResize(input); updateCharCounter();
 
   if (pendingImageFile) {
-    // There's an image waiting — upload it first, then send text
-    // We show the thinking animation now so the user sees immediate feedback
     isThinking = true;
     document.getElementById('sendBtn').disabled = true;
     document.getElementById('sendBtn').style.display = 'none';
     document.getElementById('stopBtn').classList.add('visible');
     uploadImageAndSend(prompt);
   } else {
-    // No image — just send text as before
     if (!currentChatId) {
       createChatAPI().then(c => { currentChatId = c.id; doSend(prompt); });
     } else {
@@ -635,17 +1295,18 @@ function sendMessage() {
     }
   }
 }
-// doSendText: sends just the text prompt to the server after image upload is done.
-// Called by uploadImageAndSend() once the image is uploaded.
-// doSend() is for regular text messages (no image).
+
+// ── Used by image flow ───────────────────────────────────────────────────
 function doSendText(prompt) {
-  // At this point isThinking is already true and buttons are already swapped
-  // (done in sendMessage before calling uploadImageAndSend)
   const container = document.getElementById('messages');
+  // Clear welcome if present
+  const welcome = container.querySelector('.welcome-screen');
+  if (welcome) welcome.remove();
   container.appendChild(createThinkingEl());
   scrollBottom();
 
   let assistantBubble = null, fullText = '', processedLength = 0;
+  let firstMsgInChat = !document.querySelector('#messages .msg');
   const xhr = new XMLHttpRequest();
   currentXhr = xhr;
   xhr.open('POST', '/api/chat', true);
@@ -659,17 +1320,24 @@ function doSendText(prompt) {
         const data = JSON.parse(line.slice(6));
         if (data.token !== undefined) {
           removeThinking();
-          if (!assistantBubble) assistantBubble = appendMessage('assistant', '');
+          if (!assistantBubble) assistantBubble = appendMessage('assistant', '', null, new Date().toISOString(), false);
           fullText += data.token;
           assistantBubble.innerHTML = formatContent(fullText) + '<span style="opacity:0.5">▌</span>';
           if (!userScrolled) scrollBottom();
         }
-        if (data.done) { if (assistantBubble) { assistantBubble.innerHTML = formatContent(fullText); speakText(fullText); } finish(); }
+        if (data.done) {
+          if (assistantBubble) {
+            assistantBubble.innerHTML = formatContent(fullText);
+            speakText(fullText);
+            playCompletionSound();
+          }
+          finish(firstMsgInChat);
+        }
         if (data.error) {
           removeThinking();
-          if (!assistantBubble) assistantBubble = appendMessage('assistant', '');
+          if (!assistantBubble) assistantBubble = appendMessage('assistant', '', null, null, false);
           assistantBubble.innerHTML = '<span style="color:#e24b4a">Error: ' + data.error + '</span>';
-          finish();
+          finish(false);
         }
       } catch(e) {}
     }
@@ -678,35 +1346,44 @@ function doSendText(prompt) {
     removeThinking();
     if (assistantBubble && fullText) {
       assistantBubble.innerHTML = formatContent(fullText) + '<span style="color:var(--text2);font-size:11px;"> [stopped]</span>';
-    } else if (!assistantBubble) { appendMessage('assistant', '[stopped]'); }
-    finish();
+    } else if (!assistantBubble) { appendMessage('assistant', '[stopped]', null, null, false); }
+    finish(false);
   };
   xhr.onerror = function() {
     removeThinking();
-    appendMessage('assistant', 'Connection error. Is Ollama running?');
-    finish();
+    appendMessage('assistant', 'Connection error. Is Ollama running?', null, null, false);
+    finish(false);
   };
-  xhr.send(JSON.stringify({chat_id: currentChatId, prompt: prompt || ''}));
-  function finish() {
+  xhr.send(JSON.stringify({chat_id: currentChatId, prompt: prompt || '', persona: getPersona()}));
+  function finish(triggerTitle) {
     isThinking = false; currentXhr = null;
     userScrolled = false;
     document.getElementById('sendBtn').disabled = false;
     document.getElementById('sendBtn').style.display = 'flex';
     document.getElementById('stopBtn').classList.remove('visible');
+    if (triggerTitle) maybeGenerateTitle();
     loadChats();
   }
 }
 
+// ── Main text-only flow ──────────────────────────────────────────────────
 function doSend(prompt) {
   isThinking = true;
   userScrolled = false;
   document.getElementById('sendBtn').disabled = true;
   document.getElementById('sendBtn').style.display = 'none';
   document.getElementById('stopBtn').classList.add('visible');
-  appendMessage('user', prompt);
+
+  // Check if this is the first message — if so, we'll auto-generate a title
   const container = document.getElementById('messages');
+  const welcome = container.querySelector('.welcome-screen');
+  if (welcome) welcome.remove();
+  const firstMsgInChat = container.querySelectorAll('.msg').length === 0;
+
+  appendMessage('user', prompt, null, new Date().toISOString(), false);
   container.appendChild(createThinkingEl());
   scrollBottom();
+
   let assistantBubble = null, fullText = '', processedLength = 0;
   const xhr = new XMLHttpRequest();
   currentXhr = xhr;
@@ -721,17 +1398,24 @@ function doSend(prompt) {
         const data = JSON.parse(line.slice(6));
         if (data.token !== undefined) {
           removeThinking();
-          if (!assistantBubble) assistantBubble = appendMessage('assistant', '');
+          if (!assistantBubble) assistantBubble = appendMessage('assistant', '', null, new Date().toISOString(), false);
           fullText += data.token;
           assistantBubble.innerHTML = formatContent(fullText) + '<span style="opacity:0.5">▌</span>';
-          scrollBottom();
+          if (!userScrolled) scrollBottom();
         }
-        if (data.done) { if (assistantBubble) { assistantBubble.innerHTML = formatContent(fullText); speakText(fullText); } finish(); }
+        if (data.done) {
+          if (assistantBubble) {
+            assistantBubble.innerHTML = formatContent(fullText);
+            speakText(fullText);
+            playCompletionSound();
+          }
+          finish(firstMsgInChat);
+        }
         if (data.error) {
           removeThinking();
-          if (!assistantBubble) assistantBubble = appendMessage('assistant', '');
+          if (!assistantBubble) assistantBubble = appendMessage('assistant', '', null, null, false);
           assistantBubble.innerHTML = `<span style="color:#e24b4a">Error: ${data.error}</span>`;
-          finish();
+          finish(false);
         }
       } catch(e) {}
     }
@@ -740,146 +1424,140 @@ function doSend(prompt) {
     removeThinking();
     if (assistantBubble && fullText) {
       assistantBubble.innerHTML = formatContent(fullText) + '<span style="color:var(--text2);font-size:11px;"> [stopped]</span>';
-    } else if (!assistantBubble) { appendMessage('assistant', '[stopped]'); }
-    finish();
+    } else if (!assistantBubble) { appendMessage('assistant', '[stopped]', null, null, false); }
+    finish(false);
   };
   xhr.onerror = function() {
     removeThinking();
-    appendMessage('assistant', 'Connection error. Is Ollama running?');
-    finish();
+    appendMessage('assistant', 'Connection error. Is Ollama running?', null, null, false);
+    finish(false);
   };
-  xhr.send(JSON.stringify({chat_id: currentChatId, prompt}));
-  function finish() {
+  xhr.send(JSON.stringify({chat_id: currentChatId, prompt, persona: getPersona()}));
+  function finish(triggerTitle) {
     isThinking = false; currentXhr = null;
     document.getElementById('sendBtn').disabled = false;
     document.getElementById('sendBtn').style.display = 'flex';
     document.getElementById('stopBtn').classList.remove('visible');
+    if (triggerTitle) maybeGenerateTitle();
     loadChats();
   }
 }
-function scrollBottom() { const m = document.getElementById('messages'); m.scrollTop = m.scrollHeight; }
-function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
+
+// ── FEATURE 10: Auto chat naming via Ollama ──────────────────────────────
+// Called after the first AI response. Asks Ollama for a 3-5 word title.
+async function maybeGenerateTitle() {
+  if (!currentChatId) return;
+  try {
+    const res = await fetch('/api/chats/' + currentChatId + '/title', {method: 'POST'});
+    const data = await res.json();
+    if (data.name) {
+      document.getElementById('chatTitle').textContent = data.name;
+      loadChats();
+    }
+  } catch (e) {
+    console.warn('Title generation failed:', e);
+  }
+}
+
+function scrollBottom(force) {
+  const m = document.getElementById('messages');
+  if (force) userScrolled = false;
+  m.scrollTop = m.scrollHeight;
+}
+
+// ── FEATURE 18: Keyboard shortcuts ───────────────────────────────────────
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+document.addEventListener('keydown', (e) => {
+  // Ctrl/Cmd + K — focus search
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    document.getElementById('chatSearch').focus();
+  }
+  // Ctrl/Cmd + N — new chat (but not in input)
+  if ((e.ctrlKey || e.metaKey) && e.key === 'n' && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault();
+    newChat();
+  }
+  // Escape — close settings panel / image modal / context menu
+  if (e.key === 'Escape') {
+    document.getElementById('settingsPanel').classList.remove('open');
+    closeImageModal();
+    document.querySelectorAll('.ctx-menu.open').forEach(m => m.classList.remove('open'));
+  }
+});
+
 function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
 
-// --- Pending image state ---
-// When a user picks or pastes an image, we don't upload it immediately.
-// Instead we hold it here as a "pending" image and show a preview thumbnail.
-// When they hit send, THEN we upload it and send the message together.
-// This matches how Claude/Gemini/Discord work.
-let pendingImageFile = null;   // holds the File object waiting to be uploaded
-let pendingImageUrl = null;    // holds the local preview URL (blob URL)
+// ── Pending image (unchanged from your original) ─────────────────────────
+let pendingImageFile = null;
+let pendingImageUrl = null;
 
-// showPendingImage: takes a File object and shows the thumbnail preview
-// A "blob URL" is a temporary URL like "blob://..." that points to data
-// in memory — it lets the browser display an image without uploading it.
 function showPendingImage(file) {
   pendingImageFile = file;
   pendingImageUrl = URL.createObjectURL(file);
-  // URL.createObjectURL creates a temporary browser-only URL for the file.
-  // It's instant — no upload happens. Just a way to preview locally.
-
   const preview = document.getElementById('pendingImagePreview');
   const wrap = document.getElementById('pendingImageWrap');
-  preview.src = pendingImageUrl;   // set the <img> src to our blob URL
-  wrap.style.display = 'block';    // make the preview visible
+  preview.src = pendingImageUrl;
+  wrap.style.display = 'block';
 }
 
-// cancelPendingImage: user clicked the X on the thumbnail — discard the image
 function cancelPendingImage() {
   pendingImageFile = null;
-  if (pendingImageUrl) {
-    URL.revokeObjectURL(pendingImageUrl);
-    // revokeObjectURL frees the memory used by the blob URL.
-    // Always do this when you're done with a blob URL — it's good practice.
-    pendingImageUrl = null;
-  }
+  if (pendingImageUrl) { URL.revokeObjectURL(pendingImageUrl); pendingImageUrl = null; }
   document.getElementById('pendingImageWrap').style.display = 'none';
   document.getElementById('pendingImagePreview').src = '';
 }
 
-// --- Paste image (Ctrl+V) ---
-// Listen for paste events on the whole page.
-// We check if the clipboard contains an image — if yes, we handle it.
-// If it's just text, we do nothing and let the browser paste normally.
 document.addEventListener('paste', function(e) {
   const items = e.clipboardData && e.clipboardData.items;
   if (!items) return;
-
   for (let i = 0; i < items.length; i++) {
     if (items[i].type.startsWith('image/')) {
       e.preventDefault();
-      // Stop the browser from doing its own weird image paste behavior
-
       const file = items[i].getAsFile();
       if (!file) return;
-
-      // Give the pasted image a proper filename with a timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const ext = file.type.split('/')[1] || 'png';
       const namedFile = new File([file], 'pasted-image-' + timestamp + '.' + ext, { type: file.type });
-
-      // Show the thumbnail preview — don't upload yet
       showPendingImage(namedFile);
       return;
     }
   }
-  // No image found in clipboard — let normal text paste happen
 });
 
-// --- File Upload ---
-// --- File Upload ---
-
-// handleFileUpload: called when user picks a file via the paperclip button.
-// For IMAGES: just show a preview thumbnail — don't upload yet.
-// For PDFs: upload immediately since they don't show as a visual preview.
 function handleFileUpload(input) {
   const file = input.files[0];
   if (!file) return;
-
-  const ext = file.name.rsplit ? file.name.split('.').pop().toLowerCase()
-                                : file.name.split('.').pop().toLowerCase();
+  const ext = file.name.split('.').pop().toLowerCase();
   const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
-
   if (imageExts.includes(ext) || file.type.startsWith('image/')) {
-    // IMAGE: show preview thumbnail, hold in pendingImageFile
-    // Upload happens later when user hits send
     showPendingImage(file);
   } else {
-    // PDF: upload right away and show the doc indicator
     uploadPDF(file);
   }
-
-  // Reset the file input so picking the same file again triggers onchange
   if (input.value !== undefined) input.value = '';
 }
 
-// uploadPDF: handles the actual HTTP upload for PDF files
 async function uploadPDF(file) {
   if (!currentChatId) {
     const c = await createChatAPI();
     currentChatId = c.id;
     loadChats();
   }
-
   const indicator = document.getElementById('docIndicator');
   const indicatorText = document.getElementById('docIndicatorText');
   indicator.classList.add('visible');
   indicatorText.textContent = '⏳ Processing PDF...';
-
-  // FormData is the only way to send binary files over HTTP.
-  // JSON can only hold text — FormData can hold files.
   const formData = new FormData();
   formData.append('file', file);
-
   try {
-    const res = await fetch('/api/chats/' + currentChatId + '/upload', {
-      method: 'POST',
-      body: formData
-      // IMPORTANT: Never set Content-Type manually with FormData.
-      // The browser sets it with the correct "boundary" string automatically.
-    });
+    const res = await fetch('/api/chats/' + currentChatId + '/upload', {method: 'POST', body: formData});
     const data = await res.json();
-
     if (data.ok) {
       indicatorText.textContent = '📄 ' + data.filename + ' (' + data.chunks + ' chunks)';
     } else {
@@ -892,41 +1570,24 @@ async function uploadPDF(file) {
   }
 }
 
-// uploadImageAndSend: uploads the pending image then sends the message.
-// Called from doSend() when there's a pendingImageFile waiting.
 async function uploadImageAndSend(prompt) {
-  // Ensure we have a chat to attach the image to
   if (!currentChatId) {
     const c = await createChatAPI();
     currentChatId = c.id;
     loadChats();
   }
-
   const formData = new FormData();
   formData.append('file', pendingImageFile);
-
   try {
-    const res = await fetch('/api/chats/' + currentChatId + '/upload', {
-      method: 'POST',
-      body: formData
-    });
+    const res = await fetch('/api/chats/' + currentChatId + '/upload', {method: 'POST', body: formData});
     const data = await res.json();
-
     if (data.ok) {
-      // Show image in the chat as a user message bubble BEFORE the text
-      // data.url is like "/uploads/abc123.png" — a real URL we can use in <img>
       appendImageMessage(data.url, prompt);
-
-      // Update doc indicator
       const indicator = document.getElementById('docIndicator');
       const indicatorText = document.getElementById('docIndicatorText');
       indicatorText.textContent = '🖼️ ' + data.filename;
       indicator.classList.add('visible');
-
-      // Clear the pending image state
       cancelPendingImage();
-
-      // Now send the text message — the server already knows about the image
       doSendText(prompt);
     } else {
       alert('Image upload failed: ' + data.error);
@@ -938,55 +1599,45 @@ async function uploadImageAndSend(prompt) {
   }
 }
 
-// appendImageMessage: adds an image + text bubble to the chat UI.
-// This is what makes it look like Claude/Gemini — image shown inside the bubble.
 function appendImageMessage(imageUrl, text) {
   const container = document.getElementById('messages');
+  const welcome = container.querySelector('.welcome-screen');
+  if (welcome) welcome.remove();
   const wrap = document.createElement('div');
-  wrap.className = 'msg user';   // user message, aligned to the right
-
+  wrap.className = 'msg user';
   const av = document.createElement('div');
   av.className = 'avatar user-av';
   av.textContent = 'U';
-
+  const bubbleWrap = document.createElement('div');
+  bubbleWrap.className = 'bubble-wrap';
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-
-  // Create the image element inside the bubble
   const img = document.createElement('img');
-  img.src = imageUrl;            // e.g. "/uploads/abc123.png"
+  img.src = imageUrl;
   img.className = 'bubble-image';
   img.alt = 'uploaded image';
-  bubble.appendChild(img);      // image goes first, text below it
-
-  // Add the text below the image (if there is any)
+  // FEATURE 14: click image to open fullscreen
+  img.onclick = () => openImageModal(imageUrl);
+  bubble.appendChild(img);
   if (text) {
     const textSpan = document.createElement('div');
     textSpan.innerHTML = formatContent(text);
     bubble.appendChild(textSpan);
   }
-
+  bubbleWrap.appendChild(bubble);
   wrap.appendChild(av);
-  wrap.appendChild(bubble);
+  wrap.appendChild(bubbleWrap);
   container.appendChild(wrap);
   scrollBottom();
 }
 
-// removeDoc hides the indicator. Does NOT delete ChromaDB data.
-// Full delete happens only when the chat is deleted.
-function removeDoc() {
-  document.getElementById('docIndicator').classList.remove('visible');
-}
+function removeDoc() { document.getElementById('docIndicator').classList.remove('visible'); }
 
-// When switching chats, show or hide the doc indicator based on whether
-// that chat has a document uploaded.
 function updateDocIndicator(chat) {
   const indicator = document.getElementById('docIndicator');
   const indicatorText = document.getElementById('docIndicatorText');
   if (chat.doc_name) {
     const ext = chat.doc_name.split('.').pop().toLowerCase();
-    // .split('.') splits "notes.pdf" into ["notes", "pdf"]
-    // .pop() takes the last item: "pdf"
     const icon = ['png','jpg','jpeg','gif','webp'].includes(ext) ? '🖼️' : '📄';
     indicatorText.textContent = icon + ' ' + chat.doc_name;
     indicator.classList.add('visible');
@@ -995,215 +1646,134 @@ function updateDocIndicator(chat) {
   }
 }
 
-// ── Voice System ──────────────────────────────────────────────────────────
+// ── Voice (unchanged) ────────────────────────────────────────────────────
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
 
-// These variables track the state of voice recording
-let mediaRecorder = null;      // the object that controls the microphone
-let audioChunks = [];          // array that collects audio data as it comes in
-let isRecording = false;       // true when mic is active
-
-// toggleVoice: called when user clicks the microphone button
-// If not recording → start recording
-// If recording → stop recording and send audio to Whisper
 async function toggleVoice() {
   if (isRecording) {
-    // Stop recording — this triggers the "onstop" event below
     mediaRecorder.stop();
     isRecording = false;
     document.getElementById('voiceBtn').classList.remove('recording');
     document.getElementById('voiceBtn').textContent = '🎙️';
   } else {
-    // Start recording
     try {
-      // Ask the browser for microphone access
-      // navigator.mediaDevices.getUserMedia is the browser API for accessing hardware
-      // { audio: true } means we want the microphone (not the camera)
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      // MediaRecorder is a browser API that records audio from the stream
-      // mimeType: "audio/webm" is the format most browsers support natively
       mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      audioChunks = [];   // clear any previous recording
-
-      // ondataavailable fires periodically while recording with audio data chunks
-      // We collect all chunks into our audioChunks array
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunks.push(e.data);
-      };
-
-      // onstop fires when mediaRecorder.stop() is called
-      // At this point all audio chunks have been collected
+      audioChunks = [];
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
       mediaRecorder.onstop = async () => {
-        // Combine all chunks into one Blob (binary large object)
-        // Blob is like a file in memory — it holds binary data
         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-
-        // Send to our Flask /api/transcribe route
         await sendAudioToWhisper(audioBlob);
-
-        // Stop the microphone stream completely so the mic light turns off
         stream.getTracks().forEach(track => track.stop());
-        // getTracks() gets all media tracks (audio/video)
-        // track.stop() releases the hardware
       };
-
-      // Start recording — timeslice: 1000 means fire ondataavailable every 1 second
       mediaRecorder.start(1000);
       isRecording = true;
-
-      // Update button to show recording state
       document.getElementById('voiceBtn').classList.add('recording');
       document.getElementById('voiceBtn').textContent = '⏹️';
-
     } catch (err) {
-      // User denied microphone permission or mic not available
-      alert('Microphone access denied. Please allow microphone access in your browser settings.');
+      alert('Microphone access denied.');
       console.error('Mic error:', err);
     }
   }
 }
 
-// sendAudioToWhisper: sends recorded audio to Flask, gets back transcribed text
-// Then puts the text in the input box and optionally sends the message
 async function sendAudioToWhisper(audioBlob) {
-  // Show a loading indicator in the input
   const input = document.getElementById('input');
   input.placeholder = '🎤 Transcribing...';
-
-  // FormData packages the audio blob for HTTP upload — same as file upload
   const formData = new FormData();
-  // "audio" must match request.files.get("audio") in app.py
   formData.append('audio', audioBlob, 'recording.webm');
-
   try {
-    const res = await fetch('/api/transcribe', {
-      method: 'POST',
-      body: formData
-    });
+    const res = await fetch('/api/transcribe', {method: 'POST', body: formData});
     const data = await res.json();
-
     if (data.text) {
-      // Put the transcribed text into the input box
       input.value = data.text;
       autoResize(input);
+      updateCharCounter();
       input.focus();
-      // Auto-send the message after transcription
-      // Small delay so user can see what was transcribed before it sends
       setTimeout(() => sendMessage(), 500);
     } else {
-      alert('Could not transcribe audio: ' + (data.error || 'unknown error'));
+      alert('Could not transcribe: ' + (data.error || 'unknown'));
     }
   } catch (e) {
     alert('Transcription error: ' + e.message);
   } finally {
-    // Always reset the placeholder
     input.placeholder = 'Ask anything...';
   }
 }
 
-// speakText: sends text to Flask /api/speak route, plays back the audio
-// Called after AI response finishes if "voice responses" is enabled in settings
-// stopAudio: stops any currently playing TTS audio immediately
-// Called when user switches chat, deletes a chat, or a new response starts
 function stopAudio() {
   if (currentAudio) {
-    currentAudio.pause();       // pause() stops playback immediately
-    currentAudio.currentTime = 0; // reset to beginning
-    currentAudio = null;        // clear the reference
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio = null;
   }
 }
 
 async function speakText(text) {
   if (!document.getElementById('voiceResponseToggle').checked) return;
-  // If voice responses toggle is off, do nothing
-
-  // Clean markdown before sending to TTS.
-  // edge-tts reads text literally — **bold** becomes "asterisk asterisk bold asterisk asterisk"
-  // We strip all markdown symbols so only plain readable text goes to the voice.
   text = text
-    .replace(/\*\*(.*?)\*\*/g, '$1')   // **bold** → bold
-    .replace(/\*(.*?)\*/g, '$1')        // *italic* → italic
-    .replace(/`{3}[\s\S]*?`{3}/g, 'code block')  // ```code``` → "code block"
-    .replace(/`([^`]+)`/g, '$1')        // `code` → code
-    .replace(/#{1,6}\s/g, '')           // # Heading → Heading
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')  // [link](url) → link
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/`{3}[\s\S]*?`{3}/g, 'code block')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .trim();
-
   const voice = document.getElementById('voiceSelect').value;
-  // Get the user's selected voice from the settings dropdown
-
   try {
     const res = await fetch('/api/speak', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, voice })
     });
-
     if (!res.ok) return;
-
-    // Convert the response to a Blob (the MP3 audio data)
     const audioBlob = await res.blob();
-
-    // URL.createObjectURL creates a temporary URL for the audio blob
-    // This lets us use it as an audio src without uploading anything
     const audioUrl = URL.createObjectURL(audioBlob);
-
-    // Stop any currently playing audio before starting new one
-    // Without this, two voices could play at the same time if AI responds quickly
     stopAudio();
-
-    // Create an audio element and play it
     currentAudio = new Audio(audioUrl);
     currentAudio.play();
-
-    // When audio finishes, free the blob URL memory and clear the reference
-    currentAudio.onended = () => {
-      URL.revokeObjectURL(audioUrl);
-      currentAudio = null;
-    };
-
-  } catch (e) {
-    console.error('TTS error:', e);
-    // TTS errors are silent — don't disrupt the chat
-  }
+    currentAudio.onended = () => { URL.revokeObjectURL(audioUrl); currentAudio = null; };
+  } catch (e) { console.error('TTS error:', e); }
 }
 
-// saveVoiceSettings: saves voice preferences to localStorage
-// So settings persist across page reloads
 function saveVoiceSettings() {
   localStorage.setItem('voiceResponse', document.getElementById('voiceResponseToggle').checked);
   localStorage.setItem('voiceStyle', document.getElementById('voiceSelect').value);
 }
 
-// saveAISettings: saves AI settings to localStorage
 function saveAISettings() {
   localStorage.setItem('webSearch', document.getElementById('webSearchToggle').checked);
   localStorage.setItem('temperature', document.getElementById('tempSlider').value);
+  localStorage.setItem('soundEffect', document.getElementById('soundToggle').checked);
 }
 
-// loadSettings: restores all settings from localStorage on page load
 function loadSettings() {
-  // Voice response toggle
+  // Theme toggle (already applied earlier, just set checkbox)
+  if (localStorage.getItem('theme') === 'light') {
+    document.getElementById('lightModeToggle').checked = true;
+  }
   const voiceResp = localStorage.getItem('voiceResponse');
   if (voiceResp !== null) document.getElementById('voiceResponseToggle').checked = voiceResp === 'true';
-
-  // Voice style dropdown
   const voiceStyle = localStorage.getItem('voiceStyle');
   if (voiceStyle) document.getElementById('voiceSelect').value = voiceStyle;
-
-  // Web search toggle
   const webSearch = localStorage.getItem('webSearch');
   if (webSearch !== null) document.getElementById('webSearchToggle').checked = webSearch === 'true';
-
-  // Temperature slider
   const temp = localStorage.getItem('temperature');
   if (temp) {
     document.getElementById('tempSlider').value = temp;
     document.getElementById('tempVal').textContent = temp;
   }
+  // FEATURE 19: sound effect toggle
+  const sound = localStorage.getItem('soundEffect');
+  if (sound !== null) document.getElementById('soundToggle').checked = sound === 'true';
+  // FEATURE 11: persona
+  document.getElementById('personaInput').value = getPersona();
 }
-loadSettings();
 
+loadSettings();
+updateCharCounter();
 loadChats();
 </script>
 </body>
