@@ -195,3 +195,10 @@ The main problem I noticed was that you had to type everything to the app and i 
 * I added a variable called currentaudio so it tracks when the audio is playing and then stops when the user switches conversation or deletes a conversation.
 ### Personal comments
 The main reason I actually added voice to voice was so that I can just speak long messages and its more efficient and the ai responds in a voice so I can hear what it says while doing sommething else on the computer which is really efficient. I also chose a new UI I like the color maroon red, and purple really didn't seem my fit and I heavily like aesthetics so I also added more animation while I'm at changing the UI. I also added a uncensored version for myself because I use it for my personal purposes, and I still made a censored version for other IP's that are not the local host. Overall I think this went great I spent around 1.5 hours setting this up, with the help of claude for coding. Prompting this and testing the results out is really fun and with all of this I am also learning new things because I tell claude to explain me everything it changes.
+
+
+
+
+## Log: 6/22/26 — adding new quality of life features to help the user and make it more like other ai ui.
+### Overview
+I added 20 quality of life features to the chat and the website ui. These features were: Code copy button, Chat search, ... menu on the chat where you can rename. pin. export. and .delete, Timestamps, chat exporting, character counter, a new developed welcome screen with 6 prompts, scroll to bottom button, edit last message button, ai chat naming, persona, typing indicator, message counter, image fullscreen, stop generating button, retry message button, token counter, new keyboard shortcuts, sound effect when the ai is done generating, ai's active status on the app ui.
