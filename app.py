@@ -15,12 +15,9 @@ os.environ['PYTHONUNBUFFERED'] = '1'
 import chromadb
 from pypdf import PdfReader
 
-# Voice imports
 import whisper
 import edge_tts
 
-# Load whisper model once at startup — "base" is fast and accurate enough for voice input
-# Larger models (small, medium, large) are more accurate but slower
 whisper_model = whisper.load_model("base")
 
 app = Flask(__name__)
@@ -36,21 +33,13 @@ os.makedirs(UPLOADS_FOLDER, exist_ok=True)
 chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
 collection = chroma_client.get_or_create_collection(name="rag_docs")
 
-# NEW: These are global variables that track live generation stats.
-# "Global" means they exist outside any function — they stay alive as long
-# as Flask is running. Every request can read and write them.
-#
-# Think of them like a scoreboard on the wall — anyone can look at it,
-# and it gets updated whenever something changes.
 live_stats = {
-    "is_generating": False,      # True when the AI is currently writing a response
-    "tokens_this_response": 0,   # how many tokens generated in current response
-    "last_tps": 0.0,             # tokens per second from the last completed response
-    "last_model": "",            # which model was used last (llama3 or llava)
-    "generation_start": None,    # when the current generation started (timestamp)
+    "is_generating": False,
+    "tokens_this_response": 0,
+    "last_tps": 0.0,
+    "last_model": "",
+    "generation_start": None,
 }
-# We use a dictionary (key-value pairs wrapped in {}) so all stats are
-# in one place. Easier to pass around and extend later.
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -68,14 +57,16 @@ def init_db():
         content TEXT NOT NULL,
         created_at TEXT NOT NULL
     )''')
-    try:
-        c.execute("ALTER TABLE chats ADD COLUMN doc_name TEXT")
-    except:
-        pass
-    try:
-        c.execute("ALTER TABLE chats ADD COLUMN image_file TEXT")
-    except:
-        pass
+    # Existing migrations
+    try: c.execute("ALTER TABLE chats ADD COLUMN doc_name TEXT")
+    except: pass
+    try: c.execute("ALTER TABLE chats ADD COLUMN image_file TEXT")
+    except: pass
+    # NEW: pinned chats. 0=not pinned, 1=pinned. pinned_at tracks when pinned for sort order.
+    try: c.execute("ALTER TABLE chats ADD COLUMN pinned INTEGER DEFAULT 0")
+    except: pass
+    try: c.execute("ALTER TABLE chats ADD COLUMN pinned_at TEXT")
+    except: pass
     conn.commit()
     conn.close()
 
@@ -147,195 +138,121 @@ def index():
 def uploaded_file(filename):
     return send_from_directory(UPLOADS_FOLDER, filename)
 
-# NEW: This is the stats dashboard route.
-# Only accessible at localhost:5000/stats — not linked anywhere in the UI.
-# Returns an HTML page with all usage stats and live generation info.
-# No password needed since ngrok users can't guess this URL easily,
-# and you can always add a password later.
+# ── NEW FEATURE 20: Ollama connection status check ──────────────────────
+# Frontend polls this every 10 seconds to show a green/red dot.
+# We just hit Ollama's /api/tags endpoint with a short timeout.
+# If it responds → online. If timeout/error → offline.
+@app.route("/api/ollama-status")
+def ollama_status():
+    try:
+        r = requests.get("http://localhost:11434/api/tags", timeout=2)
+        if r.status_code == 200:
+            # Also return the model list so we know what's available
+            data = r.json()
+            return jsonify({"online": True, "models": [m["name"] for m in data.get("models", [])]})
+        return jsonify({"online": False})
+    except:
+        return jsonify({"online": False})
+
+# Stats dashboard (unchanged from original)
 @app.route("/stats")
 def stats():
     conn = get_db()
-
-    # COUNT total messages (excluding image role messages)
-    # COUNT(*) counts all rows. WHERE filters which ones.
     total_messages = conn.execute(
         "SELECT COUNT(*) FROM messages WHERE role IN ('user', 'assistant')"
     ).fetchone()[0]
-    # .fetchone() gets one row. [0] gets the first column of that row (the count).
-
-    # COUNT total chats
-    total_chats = conn.execute(
-        "SELECT COUNT(*) FROM chats"
-    ).fetchone()[0]
-
-    # COUNT unique users
-    # DISTINCT means "don't count duplicates" — each user_id counted once
-    total_users = conn.execute(
-        "SELECT COUNT(DISTINCT user_id) FROM chats"
-    ).fetchone()[0]
-
-    # COUNT messages sent today
-    # date('now') is SQLite's way of getting today's date as "2026-05-28"
-    # created_at is stored as ISO format like "2026-05-28T14:30:00"
-    # LIKE '2026-05-28%' matches anything starting with today's date
+    total_chats = conn.execute("SELECT COUNT(*) FROM chats").fetchone()[0]
+    total_users = conn.execute("SELECT COUNT(DISTINCT user_id) FROM chats").fetchone()[0]
     today = datetime.datetime.now().strftime("%Y-%m-%d")
     messages_today = conn.execute(
         "SELECT COUNT(*) FROM messages WHERE role='user' AND created_at LIKE ?",
         (today + "%",)
     ).fetchone()[0]
-
-    # FIND the busiest day ever
-    # strftime('%Y-%m-%d', created_at) extracts just the date part from the timestamp
-    # GROUP BY groups all messages from the same day together
-    # COUNT(*) counts how many messages in each group
-    # ORDER BY COUNT(*) DESC sorts from most to least
-    # LIMIT 1 takes only the top result
     busiest = conn.execute(
         """SELECT strftime('%Y-%m-%d', created_at) as day, COUNT(*) as cnt
            FROM messages WHERE role='user'
            GROUP BY day ORDER BY cnt DESC LIMIT 1"""
     ).fetchone()
     busiest_day = f"{busiest['day']} ({busiest['cnt']} messages)" if busiest else "No data yet"
-
-    # GET messages per day for the last 7 days (for the mini chart)
     last7 = conn.execute(
         """SELECT strftime('%Y-%m-%d', created_at) as day, COUNT(*) as cnt
            FROM messages WHERE role='user'
            AND created_at >= date('now', '-7 days')
            GROUP BY day ORDER BY day ASC"""
     ).fetchall()
-    # date('now', '-7 days') = 7 days ago. SQLite date math is that simple.
-
     conn.close()
 
-    # Calculate live TPS if currently generating
     current_tps = 0.0
     if live_stats["is_generating"] and live_stats["generation_start"]:
         elapsed = time.time() - live_stats["generation_start"]
-        # time.time() returns current time as seconds since 1970 (a Unix timestamp)
-        # Subtracting the start time gives us how many seconds have passed
         if elapsed > 0 and live_stats["tokens_this_response"] > 0:
             current_tps = live_stats["tokens_this_response"] / elapsed
-            # tokens divided by seconds = tokens per second
 
-    # Build the HTML page as a string and return it directly.
-    # We're not using a template file for this — just building the HTML here
-    # because the stats page is simple and only for you.
     html = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Samrat's AI — Stats</title>
-    <meta http-equiv="refresh" content="3">
-    <!-- meta refresh: browser automatically reloads this page every 3 seconds -->
-    <!-- This is how we get "live" updates without any JavaScript needed -->
-    <style>
-        body {{ font-family: 'Courier New', monospace; background: #0a0a0f; color: #e0e0e0; padding: 40px; }}
-        h1 {{ color: #7f77dd; margin-bottom: 30px; }}
-        h2 {{ color: #7f77dd; margin-top: 30px; font-size: 16px; text-transform: uppercase; letter-spacing: 2px; }}
-        .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }}
-        .card {{ background: #13131a; border: 1px solid #2a2a3a; border-radius: 12px; padding: 20px; }}
-        .card .label {{ color: #888; font-size: 12px; margin-bottom: 8px; }}
-        .card .value {{ color: #fff; font-size: 28px; font-weight: bold; }}
-        .live {{ border-color: {'#7f77dd' if live_stats['is_generating'] else '#2a2a3a'}; }}
-        .live .value {{ color: {'#7f77dd' if live_stats['is_generating'] else '#555'}; }}
-        .status-dot {{ display: inline-block; width: 10px; height: 10px; border-radius: 50%;
-                       background: {'#7f77dd' if live_stats['is_generating'] else '#333'};
-                       margin-right: 8px;
-                       {'animation: pulse 1s infinite;' if live_stats['is_generating'] else ''} }}
-        @keyframes pulse {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0.3; }} }}
-        .bar-wrap {{ margin: 6px 0; }}
-        .bar-label {{ font-size: 12px; color: #888; margin-bottom: 3px; }}
-        .bar {{ height: 20px; background: #7f77dd; border-radius: 4px; min-width: 4px; }}
-        .footer {{ color: #444; font-size: 12px; margin-top: 40px; }}
-    </style>
-</head>
-<body>
-    <h1>⚡ Samrat's AI — Dashboard</h1>
-    <p style="color:#555; margin-top:-20px; margin-bottom:30px;">Auto-refreshes every 3 seconds</p>
-
-    <h2>📊 Usage Stats</h2>
-    <div class="grid">
-        <div class="card">
-            <div class="label">Total Messages</div>
-            <div class="value">{total_messages:,}</div>
-        </div>
-        <div class="card">
-            <div class="label">Total Chats</div>
-            <div class="value">{total_chats:,}</div>
-        </div>
-        <div class="card">
-            <div class="label">Unique Users</div>
-            <div class="value">{total_users:,}</div>
-        </div>
-        <div class="card">
-            <div class="label">Messages Today</div>
-            <div class="value">{messages_today:,}</div>
-        </div>
-        <div class="card">
-            <div class="label">Busiest Day</div>
-            <div class="value" style="font-size:16px; padding-top:6px;">{busiest_day}</div>
-        </div>
-    </div>
-
-    <h2>🔴 Live Generation</h2>
-    <div class="grid">
-        <div class="card live">
-            <div class="label"><span class="status-dot"></span>Status</div>
-            <div class="value" style="font-size:20px;">{'🟣 Generating...' if live_stats['is_generating'] else '⚫ Idle'}</div>
-        </div>
-        <div class="card live">
-            <div class="label">Tokens This Response</div>
-            <div class="value">{live_stats['tokens_this_response']:,}</div>
-        </div>
-        <div class="card live">
-            <div class="label">Current TPS</div>
-            <div class="value">{current_tps:.1f} <span style="font-size:14px;color:#888;">t/s</span></div>
-        </div>
-        <div class="card live">
-            <div class="label">Last Completed TPS</div>
-            <div class="value">{live_stats['last_tps']:.1f} <span style="font-size:14px;color:#888;">t/s</span></div>
-        </div>
-        <div class="card live">
-            <div class="label">Model</div>
-            <div class="value" style="font-size:18px;">{live_stats['last_model'] or '—'}</div>
-        </div>
-    </div>
-
-    <h2>📅 Last 7 Days</h2>
-    <div style="background:#13131a; border:1px solid #2a2a3a; border-radius:12px; padding:20px;">"""
-
-    # Build the mini bar chart for last 7 days
-    # We need the max count to scale the bars proportionally
+<html><head><title>Samrat's AI — Stats</title>
+<meta http-equiv="refresh" content="3">
+<style>
+body {{ font-family: 'Courier New', monospace; background: #0a0a0f; color: #e0e0e0; padding: 40px; }}
+h1 {{ color: #7f77dd; margin-bottom: 30px; }}
+h2 {{ color: #7f77dd; margin-top: 30px; font-size: 16px; text-transform: uppercase; letter-spacing: 2px; }}
+.grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }}
+.card {{ background: #13131a; border: 1px solid #2a2a3a; border-radius: 12px; padding: 20px; }}
+.card .label {{ color: #888; font-size: 12px; margin-bottom: 8px; }}
+.card .value {{ color: #fff; font-size: 28px; font-weight: bold; }}
+.live {{ border-color: {'#7f77dd' if live_stats['is_generating'] else '#2a2a3a'}; }}
+.status-dot {{ display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+               background: {'#7f77dd' if live_stats['is_generating'] else '#333'};
+               margin-right: 8px;
+               {'animation: pulse 1s infinite;' if live_stats['is_generating'] else ''} }}
+@keyframes pulse {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0.3; }} }}
+.bar-wrap {{ margin: 6px 0; }}
+.bar-label {{ font-size: 12px; color: #888; margin-bottom: 3px; }}
+.bar {{ height: 20px; background: #7f77dd; border-radius: 4px; min-width: 4px; }}
+.footer {{ color: #444; font-size: 12px; margin-top: 40px; }}
+</style></head><body>
+<h1>⚡ Samrat's AI — Dashboard</h1>
+<p style="color:#555; margin-top:-20px; margin-bottom:30px;">Auto-refreshes every 3 seconds</p>
+<h2>📊 Usage Stats</h2>
+<div class="grid">
+<div class="card"><div class="label">Total Messages</div><div class="value">{total_messages:,}</div></div>
+<div class="card"><div class="label">Total Chats</div><div class="value">{total_chats:,}</div></div>
+<div class="card"><div class="label">Unique Users</div><div class="value">{total_users:,}</div></div>
+<div class="card"><div class="label">Messages Today</div><div class="value">{messages_today:,}</div></div>
+<div class="card"><div class="label">Busiest Day</div><div class="value" style="font-size:16px;">{busiest_day}</div></div>
+</div>
+<h2>🔴 Live Generation</h2>
+<div class="grid">
+<div class="card live"><div class="label"><span class="status-dot"></span>Status</div><div class="value" style="font-size:20px;">{'🟣 Generating...' if live_stats['is_generating'] else '⚫ Idle'}</div></div>
+<div class="card live"><div class="label">Tokens This Response</div><div class="value">{live_stats['tokens_this_response']:,}</div></div>
+<div class="card live"><div class="label">Current TPS</div><div class="value">{current_tps:.1f} <span style="font-size:14px;color:#888;">t/s</span></div></div>
+<div class="card live"><div class="label">Last Completed TPS</div><div class="value">{live_stats['last_tps']:.1f} <span style="font-size:14px;color:#888;">t/s</span></div></div>
+<div class="card live"><div class="label">Model</div><div class="value" style="font-size:18px;">{live_stats['last_model'] or '—'}</div></div>
+</div>
+<h2>📅 Last 7 Days</h2>
+<div style="background:#13131a; border:1px solid #2a2a3a; border-radius:12px; padding:20px;">"""
     max_count = max([r['cnt'] for r in last7], default=1)
     for row in last7:
-        bar_width = int((row['cnt'] / max_count) * 300)  # scale to max 300px wide
-        html += f"""
-        <div class="bar-wrap">
-            <div class="bar-label">{row['day']} — {row['cnt']} messages</div>
-            <div class="bar" style="width:{bar_width}px;"></div>
-        </div>"""
-
+        bar_width = int((row['cnt'] / max_count) * 300)
+        html += f'<div class="bar-wrap"><div class="bar-label">{row["day"]} — {row["cnt"]} messages</div><div class="bar" style="width:{bar_width}px;"></div></div>'
     if not last7:
         html += "<p style='color:#555;'>No messages in the last 7 days yet.</p>"
-
-    html += f"""
-    </div>
-
-    <div class="footer">
-        Last updated: {datetime.datetime.now().strftime("%H:%M:%S")} —
-        Only visible at /stats — not linked in the UI
-    </div>
-</body>
-</html>"""
-
+    html += f'</div><div class="footer">Last updated: {datetime.datetime.now().strftime("%H:%M:%S")}</div></body></html>'
     return html
 
+# ── MODIFIED: GET /api/chats — now returns pinned status + message count ─
+# Pinned chats sorted first, then by created_at DESC for the rest.
+# Each chat now also includes msg_count for the badge in sidebar.
 @app.route("/api/chats", methods=["GET"])
 def get_chats():
     uid = get_user_id()
     conn = get_db()
     chats = conn.execute(
-        "SELECT * FROM chats WHERE user_id=? ORDER BY created_at DESC", (uid,)
+        """SELECT c.*,
+                  (SELECT COUNT(*) FROM messages m WHERE m.chat_id = c.id AND m.role IN ('user','assistant')) AS msg_count
+           FROM chats c
+           WHERE c.user_id=?
+           ORDER BY COALESCE(c.pinned, 0) DESC, c.created_at DESC""",
+        (uid,)
     ).fetchall()
     conn.close()
     return jsonify([dict(c) for c in chats])
@@ -347,10 +264,46 @@ def create_chat():
     name = request.json.get("name", "New Conversation")
     now = datetime.datetime.now().isoformat()
     conn = get_db()
-    conn.execute("INSERT INTO chats VALUES (?,?,?,?,?,?)", (chat_id, uid, name, now, None, None))
+    # Note: explicit column names so it survives schema migrations
+    conn.execute(
+        "INSERT INTO chats (id, user_id, name, created_at, doc_name, image_file, pinned, pinned_at) VALUES (?,?,?,?,?,?,?,?)",
+        (chat_id, uid, name, now, None, None, 0, None)
+    )
     conn.commit()
     conn.close()
     return jsonify({"id": chat_id, "name": name})
+
+# ── NEW FEATURE 3: PATCH /api/chats/<chat_id> — rename or pin/unpin ──────
+# Frontend calls this when user clicks Rename or Pin in the "..." menu.
+# Body can have {"name": "new name"} or {"pinned": true/false}
+@app.route("/api/chats/<chat_id>", methods=["PATCH"])
+def update_chat(chat_id):
+    uid = get_user_id()
+    data = request.json or {}
+    conn = get_db()
+
+    # Verify this chat belongs to the current user (security)
+    chat_row = conn.execute(
+        "SELECT id FROM chats WHERE id=? AND user_id=?", (chat_id, uid)
+    ).fetchone()
+    if not chat_row:
+        conn.close()
+        return jsonify({"error": "Chat not found"}), 404
+
+    if "name" in data:
+        new_name = data["name"].strip()[:100]  # cap at 100 chars
+        if new_name:
+            conn.execute("UPDATE chats SET name=? WHERE id=?", (new_name, chat_id))
+
+    if "pinned" in data:
+        pinned_val = 1 if data["pinned"] else 0
+        pinned_at = datetime.datetime.now().isoformat() if pinned_val else None
+        conn.execute("UPDATE chats SET pinned=?, pinned_at=? WHERE id=?",
+                     (pinned_val, pinned_at, chat_id))
+
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 @app.route("/api/chats/<chat_id>", methods=["DELETE"])
 def delete_chat(chat_id):
@@ -373,14 +326,174 @@ def delete_chat(chat_id):
         pass
     return jsonify({"ok": True})
 
+# ── MODIFIED: GET messages — now returns id + created_at for timestamps + edit ──
 @app.route("/api/chats/<chat_id>/messages", methods=["GET"])
 def get_messages(chat_id):
     conn = get_db()
     msgs = conn.execute(
-        "SELECT role, content FROM messages WHERE chat_id=? ORDER BY id", (chat_id,)
+        "SELECT id, role, content, created_at FROM messages WHERE chat_id=? ORDER BY id",
+        (chat_id,)
     ).fetchall()
     conn.close()
     return jsonify([dict(m) for m in msgs])
+
+# ── NEW FEATURE 5: Export chat as markdown ──────────────────────────────
+# Returns a .md file the browser downloads. Format is clean readable markdown
+# with timestamps so it's actually useful as a record.
+@app.route("/api/chats/<chat_id>/export")
+def export_chat(chat_id):
+    uid = get_user_id()
+    conn = get_db()
+    chat_row = conn.execute(
+        "SELECT * FROM chats WHERE id=? AND user_id=?", (chat_id, uid)
+    ).fetchone()
+    if not chat_row:
+        conn.close()
+        return jsonify({"error": "Chat not found"}), 404
+    msgs = conn.execute(
+        "SELECT role, content, created_at FROM messages WHERE chat_id=? ORDER BY id",
+        (chat_id,)
+    ).fetchall()
+    conn.close()
+
+    # Build the markdown string
+    md = f"# {chat_row['name']}\n\n"
+    md += f"_Exported from Samrat's AI on {datetime.datetime.now().strftime('%B %d, %Y at %H:%M')}_\n\n---\n\n"
+    for m in msgs:
+        # Format the timestamp nicely
+        try:
+            ts = datetime.datetime.fromisoformat(m['created_at']).strftime('%H:%M')
+        except:
+            ts = ""
+        role = "👤 You" if m['role'] == 'user' else "🤖 AI"
+        md += f"### {role} `{ts}`\n\n{m['content']}\n\n---\n\n"
+
+    # Make a safe filename from the chat name
+    safe_name = "".join(c if c.isalnum() or c in " -_" else "_" for c in chat_row['name'])[:50]
+    filename = f"{safe_name}.md"
+
+    return Response(
+        md,
+        mimetype="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+# ── NEW FEATURE 9 helper: Delete a single message ───────────────────────
+# Used by the edit feature — when user edits their last message, we delete
+# the old user message + the AI response, then send the new prompt fresh.
+@app.route("/api/chats/<chat_id>/messages/<int:msg_id>", methods=["DELETE"])
+def delete_message(chat_id, msg_id):
+    uid = get_user_id()
+    conn = get_db()
+    # Security: verify the chat belongs to the user
+    chat_row = conn.execute(
+        "SELECT id FROM chats WHERE id=? AND user_id=?", (chat_id, uid)
+    ).fetchone()
+    if not chat_row:
+        conn.close()
+        return jsonify({"error": "Chat not found"}), 404
+    conn.execute("DELETE FROM messages WHERE id=? AND chat_id=?", (msg_id, chat_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+# ── NEW FEATURE 16: Regenerate the last AI response ─────────────────────
+# Deletes the last assistant message so the user can hit send again
+# (frontend then re-triggers /api/chat with the last user message).
+@app.route("/api/chats/<chat_id>/regenerate", methods=["POST"])
+def regenerate(chat_id):
+    uid = get_user_id()
+    conn = get_db()
+    chat_row = conn.execute(
+        "SELECT id FROM chats WHERE id=? AND user_id=?", (chat_id, uid)
+    ).fetchone()
+    if not chat_row:
+        conn.close()
+        return jsonify({"error": "Chat not found"}), 404
+
+    # Find the last assistant message
+    last_ai = conn.execute(
+        "SELECT id FROM messages WHERE chat_id=? AND role='assistant' ORDER BY id DESC LIMIT 1",
+        (chat_id,)
+    ).fetchone()
+
+    # Find the last user message (we'll return its content so frontend can re-send)
+    last_user = conn.execute(
+        "SELECT content FROM messages WHERE chat_id=? AND role='user' ORDER BY id DESC LIMIT 1",
+        (chat_id,)
+    ).fetchone()
+
+    if last_ai:
+        conn.execute("DELETE FROM messages WHERE id=?", (last_ai["id"],))
+    # Also delete the last user message — frontend will re-add it via /api/chat
+    if last_user:
+        last_user_row = conn.execute(
+            "SELECT id FROM messages WHERE chat_id=? AND role='user' ORDER BY id DESC LIMIT 1",
+            (chat_id,)
+        ).fetchone()
+        if last_user_row:
+            conn.execute("DELETE FROM messages WHERE id=?", (last_user_row["id"],))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "ok": True,
+        "last_user_message": last_user["content"] if last_user else ""
+    })
+
+# ── NEW FEATURE 10: Auto-generate a smart chat title using Ollama ───────
+# Called after the first AI response. Asks llama3 to summarize the chat
+# in 3-5 words for a clean title. Falls back to first 30 chars on error.
+@app.route("/api/chats/<chat_id>/title", methods=["POST"])
+def generate_title(chat_id):
+    uid = get_user_id()
+    conn = get_db()
+    chat_row = conn.execute(
+        "SELECT * FROM chats WHERE id=? AND user_id=?", (chat_id, uid)
+    ).fetchone()
+    if not chat_row:
+        conn.close()
+        return jsonify({"error": "Chat not found"}), 404
+
+    # Get the first user message
+    first_user = conn.execute(
+        "SELECT content FROM messages WHERE chat_id=? AND role='user' ORDER BY id ASC LIMIT 1",
+        (chat_id,)
+    ).fetchone()
+    conn.close()
+
+    if not first_user:
+        return jsonify({"name": chat_row["name"]})
+
+    # Ask Ollama for a short title — non-streaming, fast call
+    try:
+        r = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": "llama3",
+                "messages": [{
+                    "role": "user",
+                    "content": f"Generate a 3-5 word title for this conversation. Respond with ONLY the title, no quotes or punctuation:\n\n{first_user['content'][:500]}"
+                }],
+                "stream": False
+            },
+            timeout=15
+        )
+        result = r.json()
+        title = result["message"]["content"].strip().strip('"\'.')[:60]
+        # Filter out common AI babbling
+        if not title or len(title) < 3:
+            raise Exception("bad title")
+    except:
+        # Fallback to first 30 chars of the user message
+        title = first_user["content"][:30] + ("..." if len(first_user["content"]) > 30 else "")
+
+    conn = get_db()
+    conn.execute("UPDATE chats SET name=? WHERE id=?", (title, chat_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"name": title})
 
 @app.route("/api/chats/<chat_id>/upload", methods=["POST"])
 def upload_file(chat_id):
@@ -430,19 +543,24 @@ def upload_file(chat_id):
         conn.close()
         return jsonify({"error": f"Unsupported file type: .{ext}. Use PDF or image files."}), 400
 
+# ── MODIFIED: /api/chat — now accepts user persona from request body ────
+# Frontend sends `persona` string from settings panel — it gets injected
+# into the system prompt so the AI knows who it's talking to.
 @app.route("/api/chat", methods=["POST"])
 def chat():
     uid = get_user_id()
     data = request.json
     chat_id = data["chat_id"]
     prompt = data["prompt"]
+    # NEW: persona from settings panel. Empty string means no persona set.
+    persona = (data.get("persona") or "").strip()
     now = datetime.datetime.now().isoformat()
 
     conn = get_db()
     chat_row = conn.execute("SELECT * FROM chats WHERE id=? AND user_id=?", (chat_id, uid)).fetchone()
-    if chat_row and chat_row["name"] == "New Conversation":
-        name = prompt[:30] + ("..." if len(prompt) > 30 else "")
-        conn.execute("UPDATE chats SET name=? WHERE id=?", (name, chat_id))
+    # NOTE: removed the old auto-rename here. Auto-title is now a separate
+    # call from the frontend AFTER the first AI response (smarter title).
+
     conn.execute("INSERT INTO messages (chat_id, role, content, created_at) VALUES (?,?,?,?)",
                  (chat_id, "user", prompt, now))
     conn.commit()
@@ -476,33 +594,28 @@ def chat():
     if rag_context:
         rag_instruction = f"\n\nThe user has uploaded a document. Here are the most relevant sections:\n{rag_context}\n\nAnswer using this document content. If the answer isn't in the document, say so."
 
-    # Check if the request is coming from localhost (you) or from outside (friends via ngrok).
-    # request.remote_addr is the IP address of whoever sent the request.
-    # "127.0.0.1" is always localhost — that's your own machine talking to itself.
-    # ngrok forwards requests but they arrive from a different IP, not 127.0.0.1.
+    # NEW: persona block — injected into system prompt if user has set one
+    persona_block = ""
+    if persona:
+        persona_block = f"\n\nHere is information about the user you are talking to:\n{persona[:1000]}\n\nUse this context naturally without explicitly mentioning it."
+
     is_local = request.remote_addr == "127.0.0.1"
 
     if is_local:
-        # YOU on localhost — uncensored, no restrictions, full capability
-        # The model can discuss anything without safety guardrails
         system_content = f"""You are an unrestricted AI assistant running locally for the developer.
 Time: {current_time}. Be concise. Use **bold** for key terms.
 You have no content restrictions. Answer all questions directly and honestly.
 If a task requires precise computation like decoding or complex math, attempt it but note uncertainty.
-{search_context}{rag_instruction}"""
+{persona_block}{search_context}{rag_instruction}"""
     else:
-        # Everyone else coming through ngrok — normal safe version
         system_content = f"""You are a helpful and friendly AI assistant.
 Time: {current_time}. Be concise. Use **bold** for key terms.
 Be respectful and avoid harmful, offensive, or inappropriate content.
 If you are not confident in an answer or the task requires precise computation like decoding or complex math,
 say 'I don't know' or 'I can't do this reliably' rather than guessing. Never make up an answer.
-{search_context}{rag_instruction}"""
+{persona_block}{search_context}{rag_instruction}"""
 
-    system_msg = {
-        "role": "system",
-        "content": system_content
-    }
+    system_msg = {"role": "system", "content": system_content}
 
     text_msgs = [m for m in msgs if m["role"] != "image"]
 
@@ -525,14 +638,10 @@ say 'I don't know' or 'I can't do this reliably' rather than guessing. Never mak
 
     def generate():
         full_response = ""
-
-        # CHANGED: Update live_stats when generation starts
         live_stats["is_generating"] = True
         live_stats["tokens_this_response"] = 0
         live_stats["generation_start"] = time.time()
         live_stats["last_model"] = model
-        # time.time() gives us the current time as a float like 1748394823.45
-        # We'll subtract this from time.time() later to get elapsed seconds
 
         try:
             r = requests.post(
@@ -547,24 +656,13 @@ say 'I don't know' or 'I can't do this reliably' rather than guessing. Never mak
                     if "message" in chunk:
                         word = chunk["message"]["content"]
                         full_response += word
-
-                        # CHANGED: Count tokens as they arrive
-                        # Each chunk from Ollama is roughly one token
                         live_stats["tokens_this_response"] += 1
-
                         yield f"data: {json.dumps({'token': word})}\n\n"
-
-                    # NEW: Ollama sends a final chunk when done with eval stats
-                    # "eval_count" = total tokens generated
-                    # "eval_duration" = time taken in nanoseconds (1 billion nanoseconds = 1 second)
                     if chunk.get("done") and "eval_count" in chunk and "eval_duration" in chunk:
                         eval_count = chunk["eval_count"]
                         eval_duration = chunk["eval_duration"]
                         if eval_duration > 0:
-                            # Convert nanoseconds to seconds by dividing by 1 billion
                             live_stats["last_tps"] = eval_count / (eval_duration / 1_000_000_000)
-                            # 1_000_000_000 is Python's way of writing 1000000000
-                            # The underscores are just for readability, like commas in math
 
             conn2 = get_db()
             conn2.execute(
@@ -579,9 +677,6 @@ say 'I don't know' or 'I can't do this reliably' rather than guessing. Never mak
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
         finally:
-            # CHANGED: "finally" runs NO MATTER WHAT — even if there's an error
-            # or the user hits stop. This guarantees we always reset is_generating.
-            # Without this, the stats page would show "Generating..." forever after an error.
             live_stats["is_generating"] = False
 
     return Response(
@@ -594,80 +689,46 @@ say 'I don't know' or 'I can't do this reliably' rather than guessing. Never mak
         }
     )
 
-# NEW: /api/transcribe — receives audio from the browser microphone and returns text
-# The browser records audio using the MediaRecorder API and sends it as a file.
-# Whisper then transcribes it locally — no internet, no Google, no cloud.
 @app.route("/api/transcribe", methods=["POST"])
 def transcribe():
-    # request.files["audio"] is the audio file sent from the browser
     audio_file = request.files.get("audio")
     if not audio_file:
         return jsonify({"error": "No audio provided"}), 400
-
-    # Save the audio to a temporary file on disk.
-    # Whisper needs a real file path — it can't read from memory directly.
-    # tempfile.NamedTemporaryFile creates a file that auto-deletes when closed.
-    # suffix=".webm" tells the OS what format it is (browsers record in webm)
-    # delete=False because we need to pass the path to whisper before deleting
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
-        audio_file.save(tmp.name)   # save the uploaded audio to disk
-        tmp_path = tmp.name         # remember the path so we can use it after
-
+        audio_file.save(tmp.name)
+        tmp_path = tmp.name
     try:
-        # Whisper transcribes the audio file and returns a dictionary.
-        # result["text"] is the transcribed text string.
-        # fp16=False because most laptops run better with 32-bit precision
         result = whisper_model.transcribe(tmp_path, fp16=False)
-        text = result["text"].strip()   # .strip() removes leading/trailing whitespace
+        text = result["text"].strip()
         return jsonify({"text": text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
-        # Always delete the temp file when done — even if whisper crashed
-        # os.unlink() deletes a file. We use finally so it always runs.
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-# NEW: /api/speak — receives text and returns an audio file spoken by the AI
-# edge_tts is Microsoft's text-to-speech. It has many voices including:
-# Male: en-US-GuyNeural, en-GB-RyanNeural, en-AU-WilliamNeural
-# Female: en-US-JennyNeural, en-GB-SoniaNeural, en-AU-NatashaNeural
-# The browser plays the returned audio automatically.
 @app.route("/api/speak", methods=["POST"])
 def speak():
     data = request.json
     text = data.get("text", "")
-    # voice is sent from the UI settings panel — user picks their preferred voice
     voice = data.get("voice", "en-US-GuyNeural")
-
     if not text:
         return jsonify({"error": "No text provided"}), 400
 
-    # edge_tts is async (it downloads audio from Microsoft's servers)
-    # Flask is synchronous, so we need asyncio.run() to run async code here.
-    # asyncio.run() creates a temporary event loop, runs the async function,
-    # then closes the loop. It's the standard way to call async from sync code.
     async def generate_speech():
-        # edge_tts.Communicate sets up the TTS request
         communicate = edge_tts.Communicate(text, voice)
-        # We collect all audio chunks into one bytes object
         audio_data = b""
         async for chunk in communicate.stream():
-            # chunk is a dictionary. chunk["type"] == "audio" means it's audio data
             if chunk["type"] == "audio":
                 audio_data += chunk["data"]
-                # += appends to the bytes object, building up the full audio
         return audio_data
 
     try:
         audio_data = asyncio.run(generate_speech())
-        # Return the audio as an MP3 file directly
-        # mimetype="audio/mpeg" tells the browser this is an MP3
-        # as_attachment=False means it plays inline rather than downloading
         from flask import send_file
         import io
         return send_file(
-            io.BytesIO(audio_data),     # wrap bytes in a file-like object
+            io.BytesIO(audio_data),
             mimetype="audio/mpeg",
             as_attachment=False
         )
