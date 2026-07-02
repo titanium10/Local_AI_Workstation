@@ -9,6 +9,8 @@ import base64
 import time
 import tempfile
 import asyncio
+import queue
+import threading
 
 os.environ['PYTHONUNBUFFERED'] = '1'
 
@@ -40,6 +42,105 @@ live_stats = {
     "last_model": "",
     "generation_start": None,
 }
+
+# ── Dynamic Concurrency Queue (FIFO request queue) ────────────────────────
+# Your RTX 5070 8GB can really only run ONE Ollama generation at a time.
+# If two people hit /api/chat in the same second (two friends through
+# ngrok), without a queue Ollama would either crash, hang, or silently
+# serialize requests with zero feedback to either person.
+#
+# queue_status tracks every in-flight ticket: {ticket_id: {state, created_at}}
+# state is one of: "waiting" -> "processing" -> "done"
+queue_status = {}
+queue_lock = threading.Lock()
+
+# This is the ACTUAL resource being protected. Only one thread at a time
+# may hold this lock, and holding it is what "gives permission" to talk
+# to Ollama. Everything else (queue_status, position numbers) is just
+# bookkeeping so the frontend can show "you're #2" — this lock is what
+# guarantees correctness even if that bookkeeping had a bug somewhere.
+ollama_generation_lock = threading.Lock()
+
+def enqueue_ticket():
+    """
+    Called at the start of every /api/chat request. Creates a new ticket,
+    registers it as 'waiting', and returns its id — like pulling a
+    numbered ticket at a deli counter.
+    """
+    ticket_id = str(uuid.uuid4())
+    with queue_lock:
+        queue_status[ticket_id] = {
+            "state": "waiting",
+            "created_at": time.time(),
+        }
+    return ticket_id
+
+def get_queue_position(ticket_id):
+    """Returns this ticket's 1-indexed position in line, or None if unknown."""
+    with queue_lock:
+        if ticket_id not in queue_status:
+            return None
+        active = [
+            (tid, info) for tid, info in queue_status.items()
+            if info["state"] in ("waiting", "processing")
+        ]
+        active.sort(key=lambda x: x[1]["created_at"])
+        for i, (tid, info) in enumerate(active):
+            if tid == ticket_id:
+                return i + 1
+        return None
+
+def wait_for_turn(ticket_id, timeout=300):
+    """
+    Blocks the current request thread until it's this ticket's turn to
+    use Ollama. Returns True once granted, False if we timed out (300s
+    default — protects against a wedged request hanging everyone forever).
+
+    Only the ticket at the front of the sorted line ever attempts to
+    acquire the lock, so there's no risk of two tickets racing for it.
+    We poll every 0.3s rather than a more "clever" wake-up mechanism —
+    simple to reason about, hard to get subtly wrong.
+    """
+    start = time.time()
+    while time.time() - start < timeout:
+        with queue_lock:
+            active = [
+                (tid, info) for tid, info in queue_status.items()
+                if info["state"] in ("waiting", "processing")
+            ]
+            active.sort(key=lambda x: x[1]["created_at"])
+            is_my_turn = bool(active) and active[0][0] == ticket_id
+
+        if is_my_turn:
+            acquired = ollama_generation_lock.acquire(timeout=0.5)
+            if acquired:
+                with queue_lock:
+                    queue_status[ticket_id]["state"] = "processing"
+                return True
+
+        time.sleep(0.3)
+
+    return False
+
+def release_ticket(ticket_id):
+    """
+    Called once generation is fully finished (success, error, or the user
+    hit stop). Releases the lock so the next person in line gets their
+    turn, and marks this ticket 'done'.
+
+    Wrapped in try/finally at every call site — if we ever failed to
+    release the lock, every future request would wait forever, taking
+    down the app for everyone. That's exactly the failure mode a queue
+    is supposed to prevent, not cause.
+    """
+    with queue_lock:
+        if ticket_id in queue_status:
+            queue_status[ticket_id]["state"] = "done"
+    if ollama_generation_lock.locked():
+        try:
+            ollama_generation_lock.release()
+        except RuntimeError:
+            pass
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -153,6 +254,23 @@ def ollama_status():
         return jsonify({"online": False})
     except:
         return jsonify({"online": False})
+
+# ── Concurrency queue status endpoint ─────────────────────────────────────
+# The frontend polls this (lightweight, no GPU work involved) to display
+# "you are position #2 in queue" while its main /api/chat request is
+# blocked waiting for its turn. This is a plain read of the queue_status
+# dict — it never touches Ollama, so it stays fast even while a
+# generation is in progress.
+@app.route("/api/queue/status/<ticket_id>")
+def queue_status_endpoint(ticket_id):
+    with queue_lock:
+        info = queue_status.get(ticket_id)
+    if not info:
+        # Ticket doesn't exist (already cleaned up, or never existed) —
+        # treat this as "not waiting", frontend just won't show a queue banner.
+        return jsonify({"state": "unknown", "position": None})
+    position = get_queue_position(ticket_id)
+    return jsonify({"state": info["state"], "position": position})
 
 # Stats dashboard (unchanged from original)
 @app.route("/stats")
@@ -636,8 +754,52 @@ say 'I don't know' or 'I can't do this reliably' rather than guessing. Never mak
         ][-6:]
         model = "llama3"
 
+    # Pull a numbered ticket for the concurrency queue BEFORE we start
+    # streaming anything back. This just registers us in line — it does
+    # NOT block yet. The actual waiting happens inside generate() below,
+    # so we can stream live "you're #2" updates instead of the browser
+    # just sitting there with no response at all.
+    ticket_id = enqueue_ticket()
+
     def generate():
         full_response = ""
+
+        # ── Step 1: wait our turn in the queue ──────────────────────────
+        # We only proceed past this loop once we are BOTH first in line
+        # AND have successfully grabbed ollama_generation_lock. Until
+        # then, every 0.5 seconds we check our position again and, if
+        # we're not yet first, send a small SSE message so the browser
+        # can render "You are #2 in queue..." instead of a dead spinner.
+        wait_start = time.time()
+        told_frontend_we_are_waiting = False
+        while True:
+            if time.time() - wait_start > 300:
+                # Something is badly stuck upstream (e.g. Ollama itself
+                # hung). Rather than wait forever, fail loudly so the
+                # user isn't left staring at a frozen screen.
+                yield f"data: {json.dumps({'error': 'Timed out waiting in queue. Try again.'})}\n\n"
+                release_ticket(ticket_id)
+                return
+
+            position = get_queue_position(ticket_id)
+            if position == 1:
+                # We're at the front — try to grab the actual GPU lock.
+                if ollama_generation_lock.acquire(timeout=0.5):
+                    with queue_lock:
+                        queue_status[ticket_id]["state"] = "processing"
+                    break  # got it — fall through to real generation below
+            else:
+                told_frontend_we_are_waiting = True
+                yield f"data: {json.dumps({'queued': True, 'position': position})}\n\n"
+
+            time.sleep(0.5)
+
+        # Let the frontend know it's no longer waiting, now that we've
+        # actually started (only needed if we ever told it we were queued).
+        if told_frontend_we_are_waiting:
+            yield f"data: {json.dumps({'queued': False})}\n\n"
+
+        # ── Step 2: the real generation, exactly as before ──────────────
         live_stats["is_generating"] = True
         live_stats["tokens_this_response"] = 0
         live_stats["generation_start"] = time.time()
@@ -677,7 +839,14 @@ say 'I don't know' or 'I can't do this reliably' rather than guessing. Never mak
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
         finally:
+            # This ALWAYS runs — success, error, or the user hitting stop
+            # (which aborts the HTTP connection and triggers GeneratorExit,
+            # which Python routes through this same finally block). That
+            # guarantee is exactly why we release the lock here instead of
+            # only after the try block's happy path: a stuck lock would
+            # freeze the queue for every single person after this request.
             live_stats["is_generating"] = False
+            release_ticket(ticket_id)
 
     return Response(
         generate(),
