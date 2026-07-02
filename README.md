@@ -164,8 +164,7 @@ After learning the basics of RAG, I added RAG succesfully and tested it out with
 * So firstly when I decided to add image analyising I wanted the ai to see the image every time the user asked a question about it so i decided to store them as base64 strings in SQLite itslef without affecting my storage. But the problem I noticed with this method was that if I stored them as base64 strings the images would sometimes get corrupted, so instead I decided to store them on my laptop and made a seperate folder(uploads/) which stores only the filename in the database.
 * This is a small decision and only completely affecting my storatge, I wanted to decide whether I wanted a RAG system per chat or globally, I first thought globally was better as the ai would know more information as people start uploading more pdfs. But a thought came to me that if I do that and someone puts a file with the same name or same concepts the model can give wrong information to the wrong audience, So i decided to go with per chat RAG systems.
 ### Personal comments
-it's been a long time since I have been active on github, my summatives were going on and I needed to spend more time on them to study, and I also wanted to take a break from ai as I had spent almost everyday adding a new feature. This did take me around 2 hours to implement and I haven't really sent it out for testing yet. going from gemini to Claude has completely changed the quality of the code, but form now I am also thinking to learn more about machine learning python. I haven't really been focusing on my other python repository as am really guilty about it, so I want to learn python so both the repositories stay active. The coding is completely done with ai and I only prompt made it.
-
+it's been a long time since I have been active on github, my summatives were going on and I needed to spend more time on them to study, and I also wanted to take a break from ai as I had spent almost everyday adding a new feature. This did take me around 2 hours to implement and I haven't really sent it out for testing yet. going from gemini to Claude has completely changed the quality of the code, but form now I am also thinking to learn more about machine learning python. I haven't really been focusing on my other python repository as am really guilty about it, so I want to learn python so both the repositories stay active. Vibe coded the codebase with AI assistance, but deliberately chose and vetted every architectural decision to handle local hardware constraints.
 
 
 
@@ -219,3 +218,22 @@ I added 20 quality of life features to the chat and the website ui. These featur
 * sound affect is from web audio API, to generate a ping after generation.
 ### Personal comments
 It has been a long time since I made any changes to the app but I have used it a lot, I had come to india for vacation and couldnt find time, and I am planning to buy a seperate gpu with more vram so I can add more features and a better model and try out fine tuning. Overall this project today was easy I did require manually checking all the problems from testers and spent a hour testing if those problems were true and finding other problems I wanted to solve by comparing them to another ai ui like claude and gemini. Doing this was really fun because I did try to find loopholes and try to jailbrake the ai for a few minutes, and I will be fixing those in the future projects.
+
+
+
+
+## Log: 7/2/26 — Add concurrency queue: FIFO(First-In First-Out) ticket system with lock-based GPU access control, live queue position shown in UI
+### Overview
+Added a FIFO (First-In First-Out) request to save ollama from continuous generation requests. Since the Vram would be a constraint top run more than one generation than a time. Multiple people using ngrok didn't have protection to go against it. This fixes the queing system, with the live queue-position in the UI.
+### Problems Solved
+* There wasn't any protection, so if mutliple people sent messages at the same time, it would cause GPU contention, or a request getting starved.
+* Users didn't have any feedback while waiting as there was only a thinking animation, without any indication of anything happening.
+* To guarantee fairness added a first-come first-serve system without adding any complicated infrastructure.
+### Decisions made
+* Used Python's built in threading.lock() as the gatekeeper, this solves any complex codeing, and can hold only one thread at a time, which will guarantee that Ollama never gets 2 generation calls at once.
+* used a pooling loop that checks every 0.3 to 0.5 seconds, and instead of a elegent event based wake-up system there will the a simpler reason about and harder to get subtly wrong at this scale with multiple concurrent users not thousands.
+* Also put the waiting logic inside the streaming generator function, instead of being before the HTTP responce. It will show live that "You are #2 in queue" and it updates through the SEE/XHR stream, instead of the browser being with no responce.
+* It is wrapped arounf a lock-release logic in a finally block so it will always run. Whether it's success, error, or user hitting stop. Since the lock never gets released it would not freeze for all the other users.
+* Added a 300-second timeout as a safety net just in case ollama gets bugged ans stuck so people don't wait forever.
+### Peronal comments
+After spending time on the web app I have been creating I have moved on to this project again, to take a break while still learning. I added this feature to prevent people from having a tough user experiance when multiple people are using the app. I noticed this when me and my dad were using generating responces at the same time, and the ai sometimes didn't respong or didn't read the responce, which would have been more common if there were more users, so I fixed the whole app so now there is a queue with a really small waiting time.
