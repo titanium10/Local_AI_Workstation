@@ -762,11 +762,25 @@ function createThinkingEl() {
   const canvas = document.createElement('canvas');
   canvas.width = 36; canvas.height = 36;
   const label = document.createElement('span');
+  // id lets updateThinkingLabel() find and change this text later —
+  // e.g. swapping "generating..." for "You are #2 in queue..." when the
+  // concurrency queue tells us someone else is currently using Ollama.
+  label.id = 'thinkingLabel';
   label.className = 'thinking-label'; label.textContent = 'generating...';
   bubble.appendChild(canvas); bubble.appendChild(label);
   wrap.appendChild(av); wrap.appendChild(bubble);
   animateThinking(canvas);
   return wrap;
+}
+
+// ── Concurrency queue: update the thinking bubble's text ─────────────────
+// Called whenever the backend streams a {queued: true, position: N}
+// message, meaning someone else's request is currently using the GPU
+// and we're waiting our turn. Falls back silently if the thinking
+// bubble isn't on screen for some reason.
+function updateThinkingLabel(text) {
+  const label = document.getElementById('thinkingLabel');
+  if (label) label.textContent = text;
 }
 function animateThinking(canvas) {
   const ctx = canvas.getContext('2d');
@@ -1318,6 +1332,19 @@ function doSendText(prompt) {
       if (!line.startsWith('data: ')) continue;
       try {
         const data = JSON.parse(line.slice(6));
+        // ── Concurrency queue: someone else is using the GPU right now ──
+        // The backend sends these BEFORE any tokens arrive, while we
+        // wait our turn in line. We just update the thinking bubble's
+        // text — the animated dot/particle visual keeps playing as-is,
+        // so it still reads as "something is happening", just queued
+        // instead of actively generating.
+        if (data.queued === true) {
+          const posText = data.position ? `You are #${data.position} in queue...` : 'Waiting in queue...';
+          updateThinkingLabel(posText);
+        }
+        if (data.queued === false) {
+          updateThinkingLabel('generating...');
+        }
         if (data.token !== undefined) {
           removeThinking();
           if (!assistantBubble) assistantBubble = appendMessage('assistant', '', null, new Date().toISOString(), false);
@@ -1396,6 +1423,15 @@ function doSend(prompt) {
       if (!line.startsWith('data: ')) continue;
       try {
         const data = JSON.parse(line.slice(6));
+        // Concurrency queue status — see doSendText() above for the
+        // full explanation, identical handling here.
+        if (data.queued === true) {
+          const posText = data.position ? `You are #${data.position} in queue...` : 'Waiting in queue...';
+          updateThinkingLabel(posText);
+        }
+        if (data.queued === false) {
+          updateThinkingLabel('generating...');
+        }
         if (data.token !== undefined) {
           removeThinking();
           if (!assistantBubble) assistantBubble = appendMessage('assistant', '', null, new Date().toISOString(), false);
