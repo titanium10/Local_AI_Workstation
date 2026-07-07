@@ -1218,17 +1218,64 @@ function updateCharCounter() {
   else if (len > 1500) counter.classList.add('warning');
 }
 
-// ── FEATURE 17: Token counter ────────────────────────────────────────────
-// Rough estimate: 1 token ≈ 4 characters for English text.
-// Not exact but gives a sense of context size for the user.
+// ── FEATURE 17 (upgraded): Real tokenizer integration ────────────────────
+// We used to guess "1 token ≈ 4 characters." Now we ask the backend for
+// the EXACT count, using the real Llama3 tokenizer (see count_tokens() in
+// app.py). Network calls aren't instant though, so to avoid the counter
+// feeling laggy, we:
+//   1. Immediately show the old character-based estimate (prefixed "~")
+//      so something appears on screen right away.
+//   2. Fire off a request to /api/tokenize in the background.
+//   3. When the real count comes back, replace the estimate with the
+//      exact number (no "~" prefix — it's not a guess anymore).
+//
+// requestId lets us ignore a slow, stale response if the user switches
+// chats before it comes back — without this, an old chat's token count
+// could overwrite the counter after the person has already moved on.
+let tokenCounterRequestId = 0;
+
 function updateTokenCounter(msgs) {
-  const totalChars = msgs.reduce((sum, m) => sum + (m.content || '').length, 0);
-  const tokens = Math.round(totalChars / 4);
   const counterEl = document.getElementById('tokenCounter');
+  const fullText = msgs.map(m => m.content || '').join(' ');
+
+  // Step 1: instant estimate, shown immediately (same math as before)
+  const totalChars = fullText.length;
+  const estimatedTokens = Math.round(totalChars / 4);
+  renderTokenCount(estimatedTokens, false);
+
+  if (!fullText) return;  // nothing to actually tokenize
+
+  // Step 2: ask the backend for the exact count
+  const myRequestId = ++tokenCounterRequestId;
+  fetch('/api/tokenize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: fullText })
+  })
+    .then(res => res.json())
+    .then(data => {
+      // Step 3: only apply this if it's still the most recent request —
+      // otherwise we'd be showing token counts for a chat the user
+      // already navigated away from.
+      if (myRequestId !== tokenCounterRequestId) return;
+      renderTokenCount(data.tokens, data.exact);
+    })
+    .catch(() => {
+      // Network hiccup — just leave the estimate showing, no need to
+      // interrupt the user over a display-only feature.
+    });
+}
+
+function renderTokenCount(tokens, isExact) {
+  const counterEl = document.getElementById('tokenCounter');
+  const prefix = isExact ? '' : '~';
   let display;
-  if (tokens >= 1000) display = '~' + (tokens / 1000).toFixed(1) + 'k tok';
-  else display = '~' + tokens + ' tok';
+  if (tokens >= 1000) display = prefix + (tokens / 1000).toFixed(1) + 'k tok';
+  else display = prefix + tokens + ' tok';
   counterEl.textContent = display;
+  counterEl.title = isExact
+    ? 'Exact token count from the real Llama3 tokenizer'
+    : 'Estimated (waiting for exact count, or tokenizer unavailable)';
   // Color code if approaching context window limits
   // Llama3 has 8k context — warn at 6k, red at 7k
   if (tokens > 7000) counterEl.style.color = '#e24b4a';
