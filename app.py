@@ -20,6 +20,55 @@ from pypdf import PdfReader
 import whisper
 import edge_tts
 
+# ── Real tokenizer integration ────────────────────────────────────────────
+# Your token counter used to guess with "1 token ≈ 4 characters." That's a
+# rough rule of thumb — real tokenizers don't split text by character
+# count, they split it by learned sub-word chunks (e.g. "playing" might
+# become ["play", "ing"] as 2 tokens, not "7 characters ÷ 4"). The estimate
+# and the real number can differ by 20-30% depending on the text, which
+# matters a lot once you're close to Llama3's 8k context limit.
+#
+# We use Hugging Face's `tokenizers` library (lightweight, no PyTorch
+# needed) and load the actual Llama 3 tokenizer definition — the exact
+# same vocabulary/merge rules Ollama's llama3 model uses internally. We
+# load it from "NousResearch/Meta-Llama-3-8B", an open mirror of Meta's
+# tokenizer files, since Meta's own repo requires requesting gated access
+# on Hugging Face first.
+#
+# This ONLY downloads once — after the first successful run, Hugging
+# Face's library caches the tokenizer file locally (usually under
+# ~/.cache/huggingface), so every future startup loads instantly from
+# disk with zero network call.
+try:
+    from tokenizers import Tokenizer
+    llama_tokenizer = Tokenizer.from_pretrained("NousResearch/Meta-Llama-3-8B")
+    print("✓ Real Llama3 tokenizer loaded — exact token counts enabled.")
+except Exception as e:
+    # If this fails (no internet on first run, Hugging Face is down,
+    # library not installed, etc), we fall back to the old estimate
+    # rather than crashing the whole app over a nice-to-have feature.
+    llama_tokenizer = None
+    print(f"⚠ Could not load real tokenizer, falling back to estimate. Reason: {e}")
+
+def count_tokens(text):
+    """
+    Returns the token count for a piece of text.
+    Uses the REAL Llama3 tokenizer if it loaded successfully at startup;
+    otherwise falls back to the old "1 token ≈ 4 characters" estimate so
+    the feature never hard-fails the app.
+    Returns a tuple: (count, is_exact) so the frontend can show a subtle
+    difference (e.g. "1,204 tokens" vs "~1,200 tokens").
+    """
+    if not text:
+        return 0, True
+    if llama_tokenizer is not None:
+        # .encode() runs the actual byte-pair-encoding algorithm Llama3
+        # uses, returning a list of token IDs — the length of that list
+        # IS the exact token count, no guessing involved.
+        return len(llama_tokenizer.encode(text).ids), True
+    else:
+        return max(1, len(text) // 4), False
+
 whisper_model = whisper.load_model("base")
 
 app = Flask(__name__)
@@ -271,6 +320,17 @@ def queue_status_endpoint(ticket_id):
         return jsonify({"state": "unknown", "position": None})
     position = get_queue_position(ticket_id)
     return jsonify({"state": info["state"], "position": position})
+
+# ── Real tokenizer endpoint ───────────────────────────────────────────────
+# Frontend calls this with the full conversation text whenever a chat
+# loads or a message is sent, replacing the old "chars ÷ 4" guess in the
+# header's token counter with a mathematically exact count.
+@app.route("/api/tokenize", methods=["POST"])
+def tokenize():
+    data = request.json or {}
+    text = data.get("text", "")
+    count, is_exact = count_tokens(text)
+    return jsonify({"tokens": count, "exact": is_exact})
 
 # Stats dashboard (unchanged from original)
 @app.route("/stats")
