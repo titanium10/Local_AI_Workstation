@@ -229,7 +229,7 @@ Added a FIFO (First-In First-Out) request to save ollama from continuous generat
 * There wasn't any protection, so if mutliple people sent messages at the same time, it would cause GPU contention, or a request getting starved.
 * Users didn't have any feedback while waiting as there was only a thinking animation, without any indication of anything happening.
 * To guarantee fairness added a first-come first-serve system without adding any complicated infrastructure.
-### Decisions made
+### Decisions
 * Used Python's built in threading.lock() as the gatekeeper, this solves any complex codeing, and can hold only one thread at a time, which will guarantee that Ollama never gets 2 generation calls at once.
 * used a pooling loop that checks every 0.3 to 0.5 seconds, and instead of a elegent event based wake-up system there will the a simpler reason about and harder to get subtly wrong at this scale with multiple concurrent users not thousands.
 * Also put the waiting logic inside the streaming generator function, instead of being before the HTTP responce. It will show live that "You are #2 in queue" and it updates through the SEE/XHR stream, instead of the browser being with no responce.
@@ -237,3 +237,21 @@ Added a FIFO (First-In First-Out) request to save ollama from continuous generat
 * Added a 300-second timeout as a safety net just in case ollama gets bugged ans stuck so people don't wait forever.
 ### Peronal comments
 After spending time on the web app I have been creating I have moved on to this project again, to take a break while still learning. I added this feature to prevent people from having a tough user experiance when multiple people are using the app. I noticed this when me and my dad were using generating responces at the same time, and the ai sometimes didn't respong or didn't read the responce, which would have been more common if there were more users, so I fixed the whole app so now there is a queue with a really small waiting time.
+
+
+
+
+## Log 7/7/26 - Real tokenizer
+### Overview
+Replaced the initial token counter (1 token = 4 characters) with the llama 3 tokenizer, and it provides accurate token data rather than a estimate. also added a /api/tokenize and also updated the frontend counter to update it.
+### Problems Solved
+* Based on the text type and the length of the conversation the estimate can be upto 30% off by the actual token count, which will matter when you are coming close to the 8k context limit of llama 3.1.
+* Meta's official Llama3.1 tokenizer on Hugging Face uses a gated access, and I worked around this by using the public open mirror (NousResearch/Meta-Llama-3-8B) that gives the same identical tokenzier.
+### Decisions
+* Used hugging face's tokenizer library instead of OpenAi's tiktoken tokenzier, because in a way tiktoken doesnt match the vocabulary of llama 3.1 so the tokens will still be innacurate.
+* Tokenizer loads right after flask loads, and then gets cached to the disk immidiately by the library after the first succesful run, then there are no needed network calls for the future.
+* Wrapped in a tokenizer load in try/except with a fallback to the old estimate because if it fails the app will still be working a bit innacurately based on the estimates.
+* On the front it will show the character estimate instantly with no lag, and when the exact count responds in the backend it avoids the counter being frozen while waiting for the network round-trip.
+* Also added a request-ID quard so that a slow tokenizer responce from the chat the user already navigated away from, it won'te be able to overwrite the counter for another chat they are viewing.
+### Personal Comments
+Because of the small context window of the chat, it is easy to reach the context limit fast, and to block that and know when the chat is coming to the end I added a tokenizer but the problem with the tokenizer was that it was innacurate, and sometimes the tokenizer would show 5k tokens and the chat would actually be at 8k and start hallucinating, which was a big problem, so for that reason I added a actual Llama tokenizer where it can give the most accurate number of tokens so you know when the chat is coming to an end.
