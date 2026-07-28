@@ -36,7 +36,7 @@ Plan to integrate this local model into my `My-Python-Journey` project using the
 **Hardware:** RTX 5070 (8GB VRAM) | Samsung Book6 Ultra
 
 ### Technical Milestone
-- **Model:** Llama 3.1 8B, Llava 7B
+- **Model:** Llama 3.1 8B, Llava 7B, Bonsai 27B 1-bit
 - **Framework:** Ollama (Windows PowerShell)
 - **Status:** Successful Local Inference
 - **Optimization:** 4-bit quantization utilized for VRAM efficiency.
@@ -248,10 +248,28 @@ Replaced the initial token counter (1 token = 4 characters) with the llama 3 tok
 * Based on the text type and the length of the conversation the estimate can be upto 30% off by the actual token count, which will matter when you are coming close to the 8k context limit of llama 3.1.
 * Meta's official Llama3.1 tokenizer on Hugging Face uses a gated access, and I worked around this by using the public open mirror (NousResearch/Meta-Llama-3-8B) that gives the same identical tokenzier.
 ### Decisions
-* Used hugging face's tokenizer library instead of OpenAi's tiktoken tokenzier, because in a way tiktoken doesnt match the vocabulary of llama 3.1 so the tokens will still be innacurate.
-* Tokenizer loads right after flask loads, and then gets cached to the disk immidiately by the library after the first succesful run, then there are no needed network calls for the future.
-* Wrapped in a tokenizer load in try/except with a fallback to the old estimate because if it fails the app will still be working a bit innacurately based on the estimates.
+* Used hugging face's tokenizer library instead of OpenAi's tiktoken tokenzier, because in a way tiktoken doesnt match the vocabulary of llama 3.1 so the tokens will still be inaccurate.
+* Tokenizer loads right after flask loads, and then gets cached to the disk immediately by the library after the first successful run, then there are no needed network calls for the future.
+* Wrapped in a tokenizer load in try/except with a fallback to the old estimate because if it fails the app will still be working a bit inaccurately based on the estimates.
 * On the front it will show the character estimate instantly with no lag, and when the exact count responds in the backend it avoids the counter being frozen while waiting for the network round-trip.
-* Also added a request-ID quard so that a slow tokenizer responce from the chat the user already navigated away from, it won'te be able to overwrite the counter for another chat they are viewing.
+* Also added a request-ID quard so that a slow tokenizer response from the chat the user already navigated away from, it won't be able to overwrite the counter for another chat they are viewing.
 ### Personal Comments
-Because of the small context window of the chat, it is easy to reach the context limit fast, and to block that and know when the chat is coming to the end I added a tokenizer but the problem with the tokenizer was that it was innacurate, and sometimes the tokenizer would show 5k tokens and the chat would actually be at 8k and start hallucinating, which was a big problem, so for that reason I added a actual Llama tokenizer where it can give the most accurate number of tokens so you know when the chat is coming to an end.
+Because of the small context window of the chat, it is easy to reach the context limit fast, and to block that and know when the chat is coming to the end I added a tokenizer but the problem with the tokenizer was that it was inaccurate, and sometimes the tokenizer would show 5k tokens and the chat would actually be at 8k and start hallucinating, which was a big problem, so for that reason I added a actual Llama tokenizer where it can give the most accurate number of tokens so you know when the chat is coming to an end.
+
+
+
+
+## Log 7/28/26 - Model Upgrade and Semantic Context Compression
+### Overview
+Swapped Llama# 8B to Bonsai 27B, with 1-bit quantization that comfortably fits in the same vram while being better at reasoning and complex tasks. With that also replaced the old sliding-window context which was 6 messaged with a semantic context compression. so older messages keep running as a summary instead of being forgotten. Added a start bat file so the new model is pre-loaded into the VRAM before the first message is sent.
+### Problem Solved
+* Llama3 8B was the absolute best model that could fit in 8GB VRAM, but with Bonsai 27B using 1bit quantization(3.9gb) you can break that ceiling with every single reasoning and tasks, while using less vram and without more vram.
+* When conversations became longer they lost memory after about 6 messages, then after that the model would purely guess what the previous messages were about, and would not know about what the previous messages were about.
+* First message after every restart would have a multi-second wait while Ollama loaded the model into the VRAM.
+### Decisions
+* Kept Llava as the dedicated model for messages with images rather than switching to Bonsai. Bonsai does come with a vision component but the community packaged Ollama version doesn't directly state that it's included. So it was better to keep a working image understanding rather than a broken one.
+* Compression triggers once a chat passes 8 raw messages, summarizing the oldest 4 messages, it keeps the raw message count without needing a hard cutoff.
+* The summarization call uses Bonsai rather than another dedicated model, trading a small extra latency for one less moving part in the system.
+* the warm-start runs on its own in background window so it doesn't block Flask or Ngrok.
+### Personal comments
+This whole month I have been working on another project, and I decided to make a small but drastic change because of a few complaints regarding the memory issue, this took me around an hour to implement, and it works great as there is a new smarter model and a better memory system. I am also using this system in a small raspberry pi system I did and it works really well, over time I might decide to test this in multiple different devices and run the a similar program on it so that it always stays on.
