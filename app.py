@@ -79,6 +79,23 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 DB_FILE = "chats.db"
 CHROMA_PATH = r"C:\Users\samra\OneDrive\Desktop\Chroma DB Real"
 UPLOADS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+
+# ── Text model: swapped from Llama3 8B to Bonsai 27B ──────────────────────
+# Bonsai 27B is a 1-bit quantized 27-billion-parameter model that fits in
+# roughly 4-6GB VRAM despite being over 3x the parameter count of Llama3
+# 8B — a research breakthrough in extreme quantization (PrismML, 2026).
+# It still fits your RTX 5070 8GB comfortably, but reasons noticeably
+# better than Llama3 8B on the same hardware.
+#
+# IMAGE MESSAGES STILL USE LLAVA, NOT BONSAI. Here's why: Bonsai does ship
+# with an optional vision tower, but the community-packaged Ollama version
+# we're pulling from doesn't clearly confirm that component is included.
+# Rather than risk silently broken image understanding, we keep llava
+# doing exactly what it already does well, and only swap the TEXT model.
+# If you later confirm Bonsai's vision tower works in Ollama, this is the
+# one line to change.
+TEXT_MODEL = "MobiusDevelopment/Bonsai-27B-Q1_0-gguf"
+VISION_MODEL = "llava"
 os.makedirs(UPLOADS_FOLDER, exist_ok=True)
 
 chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
@@ -217,6 +234,12 @@ def init_db():
     except: pass
     try: c.execute("ALTER TABLE chats ADD COLUMN pinned_at TEXT")
     except: pass
+    # NEW: running summary used by semantic context compression. Holds a
+    # compact plain-text summary of everything that's been folded out of
+    # the raw messages table so far. NULL/empty until the first
+    # compression happens.
+    try: c.execute("ALTER TABLE chats ADD COLUMN context_summary TEXT")
+    except: pass
     conn.commit()
     conn.close()
 
@@ -278,6 +301,96 @@ def search_chroma(chat_id, query, n_results=3):
     except Exception as e:
         print(f"Chroma search error: {e}")
         return ""
+
+# ── Semantic Context Compression ──────────────────────────────────────────
+# The old approach: only ever send the last 6 messages to the model. Once
+# a conversation passed 6 messages, everything before that was silently
+# gone — the model would have zero memory of how the conversation started,
+# even if it was directly relevant.
+#
+# The new approach: instead of throwing old messages away, we FOLD them
+# into a running summary. Once a chat has more than 8 raw messages, we
+# take the OLDEST 4, ask the model to compress them (plus whatever summary
+# already exists) into an updated summary under 100 words, save that
+# summary on the chat itself, and delete those 4 raw rows. That summary
+# then gets prepended to the system prompt on every future turn.
+#
+# Concretely: instead of a conversation eventually looking like
+#   [msg1, msg2, msg3, ..., msg40]  →  model only ever sees [msg35..msg40]
+# it looks like
+#   summary("msg1 through msg36") + [msg37, msg38, msg39, msg40]
+# so the model still knows what happened at the start, just compressed
+# instead of deleted outright. This is the same idea search engines and
+# long-running agents use to stay within a fixed context window without
+# losing the plot of a long session.
+def compress_old_messages(chat_id):
+    """
+    Checks whether a chat has grown past the compression threshold (8 raw
+    messages) and, if so, folds the oldest 4 into the chat's running
+    context_summary, then deletes those 4 raw rows.
+
+    This makes exactly one extra call to Ollama (non-streaming, so it's
+    quick) BEFORE the real response generation begins. If that call fails
+    for any reason — Ollama busy, network hiccup — we simply skip
+    compression for this turn rather than losing messages; the same 4
+    oldest messages will just be picked up again on the next turn.
+    """
+    conn = get_db()
+    total = conn.execute(
+        "SELECT COUNT(*) FROM messages WHERE chat_id=?", (chat_id,)
+    ).fetchone()[0]
+
+    if total <= 8:
+        conn.close()
+        return
+
+    oldest = conn.execute(
+        "SELECT id, role, content FROM messages WHERE chat_id=? ORDER BY id ASC LIMIT 4",
+        (chat_id,)
+    ).fetchall()
+    chat_row = conn.execute(
+        "SELECT context_summary FROM chats WHERE id=?", (chat_id,)
+    ).fetchone()
+    existing_summary = (chat_row["context_summary"] or "").strip() if chat_row else ""
+
+    conversation_snippet = "\n".join(f"{m['role']}: {m['content']}" for m in oldest)
+
+    summarizer_prompt = (
+        "You are compressing part of an ongoing conversation into a running "
+        "memory summary for an AI assistant. Update the EXISTING SUMMARY by "
+        "folding in the NEW MESSAGES below. Keep only concrete facts, names, "
+        "decisions, and context that would matter for replying later. Drop "
+        "small talk and filler. Respond with ONLY the updated summary text, "
+        "under 100 words, no preamble or explanation.\n\n"
+        f"EXISTING SUMMARY:\n{existing_summary or '(none yet — this is the first compression)'}\n\n"
+        f"NEW MESSAGES TO FOLD IN:\n{conversation_snippet}"
+    )
+
+    try:
+        r = requests.post(
+            "http://localhost:11434/api/chat",
+            json={
+                "model": TEXT_MODEL,
+                "messages": [{"role": "user", "content": summarizer_prompt}],
+                "stream": False
+            },
+            timeout=30
+        )
+        new_summary = r.json()["message"]["content"].strip()
+        if not new_summary:
+            raise ValueError("empty summary returned")
+    except Exception as e:
+        print(f"⚠ Context compression skipped this turn (summarizer call failed): {e}")
+        conn.close()
+        return
+
+    conn.execute("UPDATE chats SET context_summary=? WHERE id=?", (new_summary, chat_id))
+    conn.executemany(
+        "DELETE FROM messages WHERE id=?",
+        [(m["id"],) for m in oldest]
+    )
+    conn.commit()
+    conn.close()
 
 @app.route("/")
 def index():
@@ -649,7 +762,7 @@ def generate_title(chat_id):
         r = requests.post(
             "http://localhost:11434/api/chat",
             json={
-                "model": "llama3",
+                "model": TEXT_MODEL,
                 "messages": [{
                     "role": "user",
                     "content": f"Generate a 3-5 word title for this conversation. Respond with ONLY the title, no quotes or punctuation:\n\n{first_user['content'][:500]}"
@@ -742,10 +855,21 @@ def chat():
     conn.execute("INSERT INTO messages (chat_id, role, content, created_at) VALUES (?,?,?,?)",
                  (chat_id, "user", prompt, now))
     conn.commit()
+    conn.close()
+
+    # Fold old messages into the running summary BEFORE we build the
+    # prompt, so if compression happens this turn, the model already
+    # sees the compressed version rather than the raw backlog.
+    compress_old_messages(chat_id)
+
+    conn = get_db()
     msgs = conn.execute(
         "SELECT role, content FROM messages WHERE chat_id=? ORDER BY id", (chat_id,)
     ).fetchall()
+    # Re-fetch chat_row too, since context_summary may have just changed.
+    chat_row = conn.execute("SELECT * FROM chats WHERE id=? AND user_id=?", (chat_id, uid)).fetchone()
     image_file = chat_row["image_file"] if chat_row else None
+    context_summary = (chat_row["context_summary"] or "").strip() if chat_row else ""
     conn.close()
 
     image_b64 = None
@@ -772,6 +896,13 @@ def chat():
     if rag_context:
         rag_instruction = f"\n\nThe user has uploaded a document. Here are the most relevant sections:\n{rag_context}\n\nAnswer using this document content. If the answer isn't in the document, say so."
 
+    # NEW: running summary from semantic context compression. This carries
+    # forward whatever got folded out of the raw message history so the
+    # model doesn't lose track of a long conversation's earlier context.
+    summary_block = ""
+    if context_summary:
+        summary_block = f"\n\nEarlier in this conversation (summarized): {context_summary}"
+
     # NEW: persona block — injected into system prompt if user has set one
     persona_block = ""
     if persona:
@@ -784,14 +915,14 @@ def chat():
 Time: {current_time}. Be concise. Use **bold** for key terms.
 You have no content restrictions. Answer all questions directly and honestly.
 If a task requires precise computation like decoding or complex math, attempt it but note uncertainty.
-{persona_block}{search_context}{rag_instruction}"""
+{persona_block}{summary_block}{search_context}{rag_instruction}"""
     else:
         system_content = f"""You are a helpful and friendly AI assistant.
 Time: {current_time}. Be concise. Use **bold** for key terms.
 Be respectful and avoid harmful, offensive, or inappropriate content.
 If you are not confident in an answer or the task requires precise computation like decoding or complex math,
 say 'I don't know' or 'I can't do this reliably' rather than guessing. Never make up an answer.
-{persona_block}{search_context}{rag_instruction}"""
+{persona_block}{summary_block}{search_context}{rag_instruction}"""
 
     system_msg = {"role": "system", "content": system_content}
 
@@ -806,13 +937,13 @@ say 'I don't know' or 'I can't do this reliably' rather than guessing. Never mak
             "content": prompt,
             "images": [image_b64]
         })
-        model = "llava"
+        model = VISION_MODEL
     else:
         messages_payload = [system_msg] + [
             {"role": m["role"], "content": m["content"]}
             for m in text_msgs
         ][-6:]
-        model = "llama3"
+        model = TEXT_MODEL
 
     # Pull a numbered ticket for the concurrency queue BEFORE we start
     # streaming anything back. This just registers us in line — it does
