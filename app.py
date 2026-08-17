@@ -15,6 +15,7 @@ import threading
 os.environ['PYTHONUNBUFFERED'] = '1'
 
 import chromadb
+import numpy as np
 from pypdf import PdfReader
 
 import whisper
@@ -107,6 +108,25 @@ live_stats = {
     "last_tps": 0.0,
     "last_model": "",
     "generation_start": None,
+}
+
+# ── RAG Chunk Evaluation: relevance threshold ─────────────────────────────
+# Cosine similarity scores land between -1 and 1 (in practice ~0 to 1 for
+# these embeddings), so 0.40 is a starting guess, not a magic number. It's
+# deliberately a module-level constant so you can tune it in one place
+# after watching real scores go by in the /stats debug panel below —
+# nudge it up if irrelevant chunks are still slipping through, or down if
+# genuinely relevant chunks are getting dropped.
+RAG_RELEVANCE_THRESHOLD = 0.40
+
+# Snapshot of the most recent search_chroma() call, so the /stats page can
+# show you what actually got retrieved and scored on the last question
+# asked — without this, you'd have to trust the filtering blindly instead
+# of being able to see it happen.
+last_rag_debug = {
+    "query": "",
+    "chunks": [],       # list of {text, score, filename, kept}
+    "had_chunks": False,
 }
 
 # ── Dynamic Concurrency Queue (FIFO request queue) ────────────────────────
@@ -285,21 +305,99 @@ def store_chunks_in_chroma(chat_id, chunks, filename):
     collection.add(ids=ids, documents=chunks, metadatas=metadatas)
     return len(chunks)
 
+def cosine_similarity(vec_a, vec_b):
+    """
+    Cosine similarity measures the ANGLE between two vectors, ignoring
+    their length. That's exactly what we want for comparing embeddings:
+    two chunks can end up with different vector magnitudes just because
+    of how the embedding model happened to encode them, even when they're
+    "pointing" the same direction semantically. A distance metric like
+    raw Euclidean (L2) distance is sensitive to that magnitude difference;
+    cosine similarity isn't, so it's the more reliable "are these two
+    pieces of text about the same thing" signal.
+
+    Formula: cos(theta) = (A . B) / (|A| * |B|)
+      - A . B is the dot product (numpy: np.dot)
+      - |A| and |B| are the vector magnitudes (numpy: np.linalg.norm)
+
+    Returns a float from -1 (opposite meaning) to 1 (identical meaning).
+    Sentence-embedding models like the one Chroma uses by default rarely
+    produce negative scores in practice, so you'll mostly see 0 (unrelated)
+    to 1 (near-identical) here.
+    """
+    vec_a = np.array(vec_a)
+    vec_b = np.array(vec_b)
+    norm_a = np.linalg.norm(vec_a)
+    norm_b = np.linalg.norm(vec_b)
+    if norm_a == 0 or norm_b == 0:
+        # A zero vector has no direction, so "angle" is undefined — treat
+        # it as having zero relevance rather than crashing on a divide-by-zero.
+        return 0.0
+    return float(np.dot(vec_a, vec_b) / (norm_a * norm_b))
+
+
 def search_chroma(chat_id, query, n_results=3):
+    global last_rag_debug
     try:
         existing = collection.get(where={"chat_id": chat_id})
         if not existing["ids"]:
+            # No document uploaded for this chat at all — nothing to search,
+            # nothing to debug. Same as before this feature existed.
+            last_rag_debug = {"query": query, "chunks": [], "had_chunks": False}
             return ""
         actual_n = min(n_results, len(existing["ids"]))
+
+        # We embed the query ourselves (instead of letting query_texts=...
+        # do it silently inside Chroma) so we have the actual query vector
+        # in hand afterward to run our own cosine similarity math against
+        # each chunk vector. Chroma's `_embedding_function` is the same
+        # model it would have used internally anyway.
+        query_embedding = collection._embedding_function([query])[0]
+
         results = collection.query(
-            query_texts=[query],
+            query_embeddings=[query_embedding],
             n_results=actual_n,
-            where={"chat_id": chat_id}
+            where={"chat_id": chat_id},
+            include=["documents", "embeddings", "metadatas"]
         )
+
         chunks = results["documents"][0]
-        return "\n---\n".join(chunks)
+        embeddings = results["embeddings"][0]
+        metadatas = results["metadatas"][0]
+
+        # Score every retrieved chunk against the query, independent of
+        # whatever ordering/distance metric Chroma used internally to pick
+        # its top-N candidates in the first place.
+        scored_chunks = []
+        for chunk, chunk_embedding, meta in zip(chunks, embeddings, metadatas):
+            score = cosine_similarity(query_embedding, chunk_embedding)
+            scored_chunks.append({
+                "text": chunk,
+                "score": round(score, 4),
+                "filename": meta.get("filename", "?"),
+                "kept": score >= RAG_RELEVANCE_THRESHOLD,
+            })
+
+        # Save the full scored list (survivors AND rejects) for the /stats
+        # debug panel BEFORE filtering, so you can actually see what got
+        # dropped and why, instead of just trusting the threshold blindly.
+        last_rag_debug = {"query": query, "chunks": scored_chunks, "had_chunks": True}
+
+        kept_chunks = [c["text"] for c in scored_chunks if c["kept"]]
+
+        if not kept_chunks:
+            # Every retrieved chunk scored below the threshold. Returning ""
+            # here would look identical to "no document uploaded" to the
+            # caller, and the model would just answer from its own training
+            # data without saying so — a silent hallucination risk. Instead
+            # we return a sentinel string so the caller can tell the model
+            # explicitly that nothing relevant was found.
+            return "NO_RELEVANT_CONTEXT"
+
+        return "\n---\n".join(kept_chunks)
     except Exception as e:
         print(f"Chroma search error: {e}")
+        last_rag_debug = {"query": query, "chunks": [], "had_chunks": False, "error": str(e)}
         return ""
 
 # ── Semantic Context Compression ──────────────────────────────────────────
@@ -527,7 +625,31 @@ h2 {{ color: #7f77dd; margin-top: 30px; font-size: 16px; text-transform: upperca
         html += f'<div class="bar-wrap"><div class="bar-label">{row["day"]} — {row["cnt"]} messages</div><div class="bar" style="width:{bar_width}px;"></div></div>'
     if not last7:
         html += "<p style='color:#555;'>No messages in the last 7 days yet.</p>"
-    html += f'</div><div class="footer">Last updated: {datetime.datetime.now().strftime("%H:%M:%S")}</div></body></html>'
+    html += "</div>"
+
+    # ── RAG Chunk Evaluation debug panel ──────────────────────────────────
+    # Shows exactly what the last search_chroma() call scored, so the
+    # filtering can be visually verified instead of trusted blindly.
+    html += '<h2>🧠 Last RAG Query — Chunk Relevance</h2>'
+    html += '<div style="background:#13131a; border:1px solid #2a2a3a; border-radius:12px; padding:20px;">'
+    if not last_rag_debug["had_chunks"]:
+        html += "<p style='color:#555;'>No RAG query has run yet this session (or the last question had no document to search).</p>"
+    else:
+        html += f'<p style="color:#888; margin-bottom:16px;">Query: <span style="color:#fff;">"{last_rag_debug["query"]}"</span> &nbsp;|&nbsp; Threshold: <span style="color:#7f77dd;">{RAG_RELEVANCE_THRESHOLD}</span></p>'
+        for c in last_rag_debug["chunks"]:
+            kept = c["kept"]
+            bar_color = "#7f77dd" if kept else "#553333"
+            badge = "✅ KEPT" if kept else "❌ DROPPED (below threshold)"
+            badge_color = "#7f77dd" if kept else "#e06060"
+            preview = c["text"][:160].replace("<", "&lt;").replace(">", "&gt;")
+            html += f'''<div style="margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid #222230;">
+<div class="bar-label">{c["filename"]} — score {c["score"]:.4f} — <span style="color:{badge_color};">{badge}</span></div>
+<div class="bar" style="width:{int(max(c["score"],0)*300)}px; background:{bar_color};"></div>
+<div style="color:#666; font-size:12px; margin-top:6px;">{preview}...</div>
+</div>'''
+    html += "</div>"
+
+    html += f'<div class="footer">Last updated: {datetime.datetime.now().strftime("%H:%M:%S")}</div></body></html>'
     return html
 
 # ── MODIFIED: GET /api/chats — now returns pinned status + message count ─
@@ -893,7 +1015,13 @@ def chat():
     rag_context = search_chroma(chat_id, prompt)
     current_time = datetime.datetime.now().strftime("%I:%M %p on %A, %B %d, %Y")
     rag_instruction = ""
-    if rag_context:
+    if rag_context == "NO_RELEVANT_CONTEXT":
+        # Every retrieved chunk was below RAG_RELEVANCE_THRESHOLD. Tell the
+        # model that explicitly instead of sending it nothing and letting it
+        # guess — an explicit "not found" beats a silent gap it might paper
+        # over with a hallucinated answer.
+        rag_instruction = "\n\nThe user has uploaded a document, but no sufficiently relevant section was found for this question. Tell the user you couldn't find relevant document context for this question, rather than guessing."
+    elif rag_context:
         rag_instruction = f"\n\nThe user has uploaded a document. Here are the most relevant sections:\n{rag_context}\n\nAnswer using this document content. If the answer isn't in the document, say so."
 
     # NEW: running summary from semantic context compression. This carries
