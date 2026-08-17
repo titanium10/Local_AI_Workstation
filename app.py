@@ -81,21 +81,26 @@ DB_FILE = "chats.db"
 CHROMA_PATH = r"C:\Users\samra\OneDrive\Desktop\Chroma DB Real"
 UPLOADS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
 
-# ── Text model: swapped from Llama3 8B to Bonsai 27B ──────────────────────
-# Bonsai 27B is a 1-bit quantized 27-billion-parameter model that fits in
-# roughly 4-6GB VRAM despite being over 3x the parameter count of Llama3
-# 8B — a research breakthrough in extreme quantization (PrismML, 2026).
-# It still fits your RTX 5070 8GB comfortably, but reasons noticeably
-# better than Llama3 8B on the same hardware.
+# ── Text model: Gemma2 9B (previously Bonsai 27B, before that Llama3 8B) ──
+# Bonsai 27B's 1-bit quantization turned out to be too aggressive in
+# practice — real testing showed it rambling/repeating on simple prompts
+# (1,192 tokens for a 10-word joke request), a known risk with extreme
+# quantization: you save VRAM, but response quality can degrade in ways
+# that are hard to predict ahead of time.
 #
-# IMAGE MESSAGES STILL USE LLAVA, NOT BONSAI. Here's why: Bonsai does ship
-# with an optional vision tower, but the community-packaged Ollama version
-# we're pulling from doesn't clearly confirm that component is included.
-# Rather than risk silently broken image understanding, we keep llava
-# doing exactly what it already does well, and only swap the TEXT model.
-# If you later confirm Bonsai's vision tower works in Ollama, this is the
-# one line to change.
-TEXT_MODEL = "MobiusDevelopment/Bonsai-27B-Q1_0-gguf"
+# Gemma2 9B uses standard, well-tested 4-bit quantization instead of
+# anything experimental — still noticeably smarter than Llama3 8B (more
+# parameters, generally stronger benchmarks), comfortably fits the RTX
+# 5070 8GB, and doesn't carry Bonsai's reliability risk. The lesson this
+# swap taught: a model being bigger on paper doesn't matter if the
+# compression needed to fit it degrades actual output quality — reliable
+# and well-tested beats "technically more parameters" almost every time
+# for a production app real people are actually using.
+#
+# IMAGE MESSAGES STILL USE LLAVA, NOT THE TEXT MODEL. Gemma2 9B doesn't
+# have vision support in Ollama's standard build, so this split (separate
+# text vs. vision model) stays exactly as it was for Bonsai.
+TEXT_MODEL = "gemma2:9b"
 VISION_MODEL = "llava"
 os.makedirs(UPLOADS_FOLDER, exist_ok=True)
 
@@ -123,11 +128,25 @@ RAG_RELEVANCE_THRESHOLD = 0.40
 # show you what actually got retrieved and scored on the last question
 # asked — without this, you'd have to trust the filtering blindly instead
 # of being able to see it happen.
+#
+# rag_debug_lock protects this the same way queue_lock protects the
+# concurrency queue's bookkeeping: last_rag_debug is a plain dict written
+# from inside request-handling code, and Flask runs each request on its
+# own thread (threaded=True). Without a lock, if two people asked document
+# questions in different chats at nearly the same moment, one person's
+# write to this dict could interleave with the other's — e.g. person A's
+# "chunks" list ending up paired with person B's "query" string in the
+# debug panel. This never affects anyone's actual answer (each request
+# still uses its own local `scored_chunks` for the real prompt), it would
+# only ever make the /stats debug DISPLAY briefly show a mismatched
+# snapshot — but it's a five-line fix, so worth doing properly rather than
+# leaving a known race condition sitting in the code.
 last_rag_debug = {
     "query": "",
     "chunks": [],       # list of {text, score, filename, kept}
     "had_chunks": False,
 }
+rag_debug_lock = threading.Lock()
 
 # ── Dynamic Concurrency Queue (FIFO request queue) ────────────────────────
 # Your RTX 5070 8GB can really only run ONE Ollama generation at a time.
@@ -343,7 +362,8 @@ def search_chroma(chat_id, query, n_results=3):
         if not existing["ids"]:
             # No document uploaded for this chat at all — nothing to search,
             # nothing to debug. Same as before this feature existed.
-            last_rag_debug = {"query": query, "chunks": [], "had_chunks": False}
+            with rag_debug_lock:
+                last_rag_debug = {"query": query, "chunks": [], "had_chunks": False}
             return ""
         actual_n = min(n_results, len(existing["ids"]))
 
@@ -381,7 +401,8 @@ def search_chroma(chat_id, query, n_results=3):
         # Save the full scored list (survivors AND rejects) for the /stats
         # debug panel BEFORE filtering, so you can actually see what got
         # dropped and why, instead of just trusting the threshold blindly.
-        last_rag_debug = {"query": query, "chunks": scored_chunks, "had_chunks": True}
+        with rag_debug_lock:
+            last_rag_debug = {"query": query, "chunks": scored_chunks, "had_chunks": True}
 
         kept_chunks = [c["text"] for c in scored_chunks if c["kept"]]
 
@@ -397,7 +418,8 @@ def search_chroma(chat_id, query, n_results=3):
         return "\n---\n".join(kept_chunks)
     except Exception as e:
         print(f"Chroma search error: {e}")
-        last_rag_debug = {"query": query, "chunks": [], "had_chunks": False, "error": str(e)}
+        with rag_debug_lock:
+            last_rag_debug = {"query": query, "chunks": [], "had_chunks": False, "error": str(e)}
         return ""
 
 # ── Semantic Context Compression ──────────────────────────────────────────
@@ -630,13 +652,26 @@ h2 {{ color: #7f77dd; margin-top: 30px; font-size: 16px; text-transform: upperca
     # ── RAG Chunk Evaluation debug panel ──────────────────────────────────
     # Shows exactly what the last search_chroma() call scored, so the
     # filtering can be visually verified instead of trusted blindly.
+    #
+    # We copy the dict out under the lock ONCE, right here, then read from
+    # that local copy (rag_debug_snapshot) for the rest of the panel. This
+    # matters because /stats auto-refreshes every 3 seconds while other
+    # requests may be writing to last_rag_debug at any moment — reading
+    # the shared dict's keys one at a time (like the old code did) could
+    # theoretically render a query string from one write mixed with a
+    # chunks list from a different write that landed in between. Grabbing
+    # one snapshot under the lock means this whole panel always reflects
+    # a single, real, complete search_chroma() call — never a mix of two.
+    with rag_debug_lock:
+        rag_debug_snapshot = dict(last_rag_debug)
+
     html += '<h2>🧠 Last RAG Query — Chunk Relevance</h2>'
     html += '<div style="background:#13131a; border:1px solid #2a2a3a; border-radius:12px; padding:20px;">'
-    if not last_rag_debug["had_chunks"]:
+    if not rag_debug_snapshot["had_chunks"]:
         html += "<p style='color:#555;'>No RAG query has run yet this session (or the last question had no document to search).</p>"
     else:
-        html += f'<p style="color:#888; margin-bottom:16px;">Query: <span style="color:#fff;">"{last_rag_debug["query"]}"</span> &nbsp;|&nbsp; Threshold: <span style="color:#7f77dd;">{RAG_RELEVANCE_THRESHOLD}</span></p>'
-        for c in last_rag_debug["chunks"]:
+        html += f'<p style="color:#888; margin-bottom:16px;">Query: <span style="color:#fff;">"{rag_debug_snapshot["query"]}"</span> &nbsp;|&nbsp; Threshold: <span style="color:#7f77dd;">{RAG_RELEVANCE_THRESHOLD}</span></p>'
+        for c in rag_debug_snapshot["chunks"]:
             kept = c["kept"]
             bar_color = "#7f77dd" if kept else "#553333"
             badge = "✅ KEPT" if kept else "❌ DROPPED (below threshold)"
@@ -1124,10 +1159,31 @@ say 'I don't know' or 'I can't do this reliably' rather than guessing. Never mak
         live_stats["generation_start"] = time.time()
         live_stats["last_model"] = model
 
+        # r is declared here (not inside try) so the GeneratorExit handler
+        # below can reach it even if the connection to Ollama is still
+        # being established when the tab gets closed.
+        r = None
         try:
             r = requests.post(
                 "http://localhost:11434/api/chat",
-                json={"model": model, "messages": messages_payload, "stream": True},
+                json={
+                    "model": model,
+                    "messages": messages_payload,
+                    "stream": True,
+                    # ── Runaway-generation safety net ────────────────────
+                    # Bug report: "tell me a joke in under 10 words" took
+                    # 1,192 tokens and ~2 minutes — the model rambled or
+                    # looped instead of answering concisely, a known risk
+                    # with Bonsai's aggressive 1-bit quantization. Rather
+                    # than trust every model to always self-terminate at a
+                    # reasonable length, we cap it here: num_predict tells
+                    # Ollama to hard-stop generation after this many
+                    # tokens no matter what the model is doing. 400 tokens
+                    # is generous for a normal chat reply (roughly a long
+                    # paragraph) while making a repetition loop cost
+                    # seconds instead of minutes.
+                    "options": {"num_predict": 400}
+                },
                 stream=True,
                 timeout=(10, 120)
             )
@@ -1154,16 +1210,41 @@ say 'I don't know' or 'I can't do this reliably' rather than guessing. Never mak
             conn2.close()
             yield f"data: {json.dumps({'done': True})}\n\n"
 
+        except GeneratorExit:
+            # ── Bug fix: closing the tab left Ollama generating unwatched ──
+            # This fires when Flask notices the browser is gone — either
+            # the user hit Stop (aborting the XHR) or they closed the tab
+            # entirely. Before this fix, we only stopped OUR OWN loop from
+            # yielding — but the actual request to Ollama (the `r` object)
+            # was left open, so Ollama kept computing tokens nobody would
+            # ever see, for however long the response takes to finish
+            # naturally. That's exactly why the bug report describes it
+            # "stopping after a while" instead of stopping immediately —
+            # "a while" was just Ollama finishing its full (in this case
+            # bloated, 1,192-token) response on its own.
+            #
+            # r.close() closes the underlying network connection to
+            # Ollama. Ollama detects the client disconnecting and aborts
+            # generation right away, freeing the GPU immediately instead
+            # of grinding through a response nobody will ever read.
+            if r is not None:
+                r.close()
+            # Python requires GeneratorExit to be re-raised (or the
+            # interpreter treats not doing so as a bug in the generator)
+            # — this still lets the `finally` block below run normally
+            # afterward, so the queue ticket and live_stats still get
+            # cleaned up exactly as before.
+            raise
+
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
         finally:
-            # This ALWAYS runs — success, error, or the user hitting stop
-            # (which aborts the HTTP connection and triggers GeneratorExit,
-            # which Python routes through this same finally block). That
-            # guarantee is exactly why we release the lock here instead of
-            # only after the try block's happy path: a stuck lock would
-            # freeze the queue for every single person after this request.
+            # This ALWAYS runs — success, error, GeneratorExit (stop
+            # button OR closed tab), everything. That guarantee is exactly
+            # why we release the lock here instead of only after the try
+            # block's happy path: a stuck lock would freeze the queue for
+            # every single person after this request.
             live_stats["is_generating"] = False
             release_ticket(ticket_id)
 
