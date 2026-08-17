@@ -53,20 +53,23 @@ if %errorlevel% neq 0 (
     echo  [OK] Ollama already running
 )
 
-:: ── STEP 2.5: Pre-load Bonsai 27B into VRAM ────────────────────────
+:: ── STEP 2.5: Pre-load Gemma2 9B into VRAM ─────────────────────────
 :: Ollama loads a model into VRAM the FIRST time it's asked to generate
-:: something — that first load takes several seconds (reading ~3.9GB off
-:: disk). Without this step, whoever sends the very first chat message
+:: something — that first load takes several seconds reading it off
+:: disk. Without this step, whoever sends the very first chat message
 :: after a fresh restart would eat that delay themselves, on top of
 :: normal generation time.
 ::
 :: We avoid that by "warming up" the model right now, before anyone's
 :: even opened the app: we send it a throwaway one-word prompt in the
 :: background and immediately move on to starting Flask. By the time a
-:: real person types a real message, Bonsai is already sitting in VRAM
+:: real person types a real message, Gemma2 is already sitting in VRAM
 :: ready to go.
-echo  [..] Pre-loading Bonsai 27B into VRAM (warm start)...
-start /min "" cmd /c "curl -s http://localhost:11434/api/generate -d "{\"model\": \"MobiusDevelopment/Bonsai-27B-Q1_0-gguf\", \"prompt\": \"hi\", \"stream\": false}" >nul 2>&1"
+:: (Previously this warmed Bonsai 27B — swapped after real-world testing
+:: showed Bonsai's 1-bit quantization causing rambling/repetitive
+:: responses. See app.py's TEXT_MODEL comment for the full story.)
+echo  [..] Pre-loading Gemma2 9B into VRAM (warm start)...
+start /min "" cmd /c "curl -s http://localhost:11434/api/generate -d "{\"model\": \"gemma2:9b\", \"prompt\": \"hi\", \"stream\": false}" >nul 2>&1"
 :: This runs in its own minimized window so it doesn't block the rest of
 :: this script — Flask starts loading at the same time the model is
 :: warming up, instead of us waiting around for both one after another.
