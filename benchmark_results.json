@@ -1,0 +1,125 @@
+{
+  "Llama3 8B": {
+    "short_factual": [
+      {
+        "success": true,
+        "response_text": "The capital of Japan is Tokyo.",
+        "word_count": 6,
+        "token_count": 8,
+        "wall_clock_seconds": 10.74,
+        "tokens_per_sec": 21.4
+      }
+    ],
+    "strict_length_instruction": [
+      {
+        "success": true,
+        "response_text": "Why was math book sad? Because it had problems!",
+        "word_count": 9,
+        "token_count": 12,
+        "wall_clock_seconds": 3.01,
+        "tokens_per_sec": 25.0
+      }
+    ],
+    "reasoning": [
+      {
+        "success": true,
+        "response_text": "To find the arrival time, we need to calculate the travel time first.\n\nDistance = 180 miles\nSpeed = 60 mph\n\nTravel time = Distance / Speed = 180 miles / 60 mph = 3 hours\n\nSince the train leaves at 3 pm, we add the travel time to find the arrival time:\n\nArrival time = 3 pm + 3 hours = 6 pm",
+        "word_count": 64,
+        "token_count": 82,
+        "wall_clock_seconds": 7.76,
+        "tokens_per_sec": 15.6
+      }
+    ],
+    "coding": [
+      {
+        "success": true,
+        "response_text": "```\ndef factorial(n):\n    if n == 1:\n        return 1\n    else:\n        return n * factorial(n-1)",
+        "word_count": 14,
+        "token_count": 31,
+        "wall_clock_seconds": 4.25,
+        "tokens_per_sec": 17.8
+      }
+    ]
+  },
+  "Bonsai 27B (1-bit)": {
+    "short_factual": [
+      {
+        "success": true,
+        "response_text": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - Question: \"What is the capital of Japan?\"\n   - Constraint: \"Answer in one sentence.\"\n\n2.  **Identify Key Information:**\n   - The capital of Japan is Tokyo.\n\n3.  **Formulate Response (mental draft):**\n   - Tokyo is the capital of Japan.\n   - Check constraint: One sentence? Yes.\n   - Check accuracy: Correct.\n\n4.  **Final Output Generation:**\n   - \"Tokyo is the capital of Japan.\" (Matches constraint exactly)✅\n</think>\n\nTokyo is the capital of Japan.",
+        "word_count": 76,
+        "token_count": 140,
+        "wall_clock_seconds": 28.71,
+        "tokens_per_sec": 8.9
+      }
+    ],
+    "strict_length_instruction": [
+      {
+        "success": false,
+        "error": "HTTPConnectionPool(host='localhost', port=11434): Read timed out. (read timeout=180)",
+        "wall_clock_seconds": 182.04
+      }
+    ],
+    "reasoning": [
+      {
+        "success": true,
+        "response_text": "Here's a thinking process:\n\n1.  **Analyze User Input:**\n   - **Departure time:** 3 PM\n   - **Speed:** 60 mph\n   - **Distance:** 180 miles\n   - **Question:** What time does it arrive?\n   - **Requirement:** Show reasoning briefly.\n\n2.  **Identify Key Mathematical Concept:**\n   - Time = Distance / Speed\n   - This is a basic kinematics formula.\n\n3.  **Calculate Travel Time:**\n   - Distance = 180 miles\n   - Speed = 60 mph\n   - Time = 180 / 60 = 3 hours\n\n4.  **Calculate Arrival Time:**\n   - Departure = 3 PM\n   - Add 3 hours: 3 PM + 3 hours = 6 PM\n\n5.  **Formulate Response (Brief Reasoning):**\n   - State the formula: Time = Distance ÷ Speed\n   - Plug in values: 180 miles ÷ 60 mph = 3 hours\n   - Add to departure time: 3 PM + 3 hours = 6 PM\n   - Keep it concise as requested.\n\n6.  **Self-Correction/Verification:**\n   - Check math: 60 * 3 = 180. Correct.\n   - Check time: 3 PM + 3 hrs = 6 PM. Correct.\n   - Assumptions: No stops mentioned, constant speed, straight line time calculation. All standard for this type of problem.\n   - Format: Brief reasoning + direct answer.\n\n   Everything looks solid.\n\n7.  **Draft Response:**\n   To find the arrival time, use the formula: **Time = Distance ÷ Speed**.\n   - Travel time = 180 miles ÷ 60 mph = 3 hours\n   - Adding 3 hours to the 3 PM departure gives **6 PM**.\n   So, the train arrives at **6 PM**.✅\n   Matches requirement. Ready. \n   Output matches response.✅\n   Proceed. \n   [Output Generation] -> *Proceeds*\n   *(Self-Correction/Refinement during thought)*: \n   The prompt says \"Show your reasoning briefly.\" I'll keep it tight. No extra fluff. The draft is good. All steps are clear. No hidden tricks. Assumptions are standard. Output matches exactly.✅\n   Final check of the prompt: \"If a train leaves at 3pm going 60mph and needs to travel 180 miles, what time does it arrive? Show your reasoning briefly.\" -> All good. \n   Output matches the drafted response.✅\n   [Done.] \n   *Output Generation* (matches the final draft)\n   \"To find the arrival time, use the formula: **Time = Distance ÷ Speed**.\n   - Travel time = 180 miles ÷ 60 mph = 3 hours\n   - Adding 3 hours to the 3 PM departure gives **6 PM**.\n   The train arrives at **6 PM**.\"✅\n   Perfect. \n   [Proceeds]\n</think>\n\nTo find the arrival time, use the basic formula: **Time = Distance ÷ Speed**.\n\n- Travel time = 180 miles ÷ 60 mph = **3 hours**\n- Adding 3 hours to the 3 PM departure gives **6 PM**.\n\nThe train arrives at **6 PM**.",
+        "word_count": 416,
+        "token_count": 749,
+        "wall_clock_seconds": 90.08,
+        "tokens_per_sec": 8.6
+      }
+    ],
+    "coding": [
+      {
+        "success": true,
+        "response_text": "Here's a thinking process:\n\n1.  **Analyze User Request:**\n   - **Task:** Write a Python function that returns the factorial of a number.\n   - **Constraint:** Just the code, no explanation.\n\n2.  **Identify Key Requirements:**\n   - Function name: something like `factorial`\n   - Input: a number (integer, typically non-negative)\n   - Output: factorial of that number\n   - Implementation: Can be iterative or recursive. I'll go with iterative for efficiency and simplicity, or recursive for elegance. Both are fine. I'll use iterative as it's generally safer for larger numbers in Python (though Python handles recursion limits well for small factorials). Actually, Python's built-in `math.factorial` exists, but the prompt asks to \"write a Python function\", implying I should implement it myself.\n   - Constraint: \"Just the code, no explanation.\"\n\n3.  **Draft Code (Mental):**\n   ```python\n   def factorial(n):\n       if n < 0:\n           raise ValueError(\"Factorial is not defined for negative numbers\")\n       result = 1\n       for i in range(2, n + 1):\n           result *= i\n       return result\n   ```\n\n4.  **Check Constraints:**\n   - Returns factorial? Yes.\n   - Just code? Yes.\n   - No explanation? Yes.\n   - Handles edge cases? n=0 returns 1 (correct), n<0 raises error (good practice), though sometimes simple implementations just assume valid input. I'll keep it simple and robust.\n\n   Alternative recursive:\n   ```python\n   def factorial(n):\n       return 1 if n == 0 else n * factorial(n - 1)\n   ```\n   But iterative is generally preferred. I'll stick with iterative. Actually, I can make it even simpler without error handling if not required, but it's better practice. The prompt doesn't specify error handling, so I'll keep it straightforward.\n\n   Let's go with:\n   ```python\n   def factorial(n):\n       result = 1\n       for i in range(2, n + 1):\n           result *= i\n       return result\n   ```\n\n   Wait, what about n=0? range(2, 1) is empty, result stays 1. Correct.\n   What about negative? It would return 1, which is mathematically wrong. I should add a check or just assume non-negative as is standard for factorial functions. I'll add a simple check or just keep it minimal. Given the strict \"just the code\" constraint, I'll provide a clean, standard implementation.\n\n   Let's stick to:\n   ```python\n   def factorial(n):\n       if n < 0:\n           raise ValueError(\"Factorial is not defined for negative numbers\")\n       result = 1\n       for i in range(2, n + 1):\n           result *= i\n       return result\n   ```\n\n   Actually, many coding platforms expect just the core logic. I'll keep it simple and robust.\n\n   Final decision:\n   ```python\n   def factorial(n):\n       if n < 0:\n           raise ValueError(\"Factorial is not defined for negative numbers\")\n       result = 1\n       for i in range(2, n + 1):\n           result *= i\n       return result\n   ```\n\n   Check constraint: \"Just the code, no explanation.\" -> I will output exactly this code block and nothing else.\n\n5.  **Output Generation:** (matches the final decision)\n   I'll output just the Python code block. No extra text.✅\n   One minor thing: Python's `math.factorial` is built-in, but the prompt says \"Write a Python function that returns the factorial of a number.\" So implementing it manually is expected.\n   I'll provide the iterative version. It's clean and efficient.\n   Ready.✅\n   Output matches response. \n   Proceeds. \n   [Self-Correction/Refinement during thought]\n   Should I include type hints? Not necessary, but could be nice. I'll keep it simple.\n   The prompt says \"Just the code, no explanation.\" I will strictly output only the code.\n   Code:\n   ```python\n   def factorial(n):\n       if n < 0:\n           raise ValueError(\"Factorial is not defined for negative numbers\")\n       result = 1\n       for i in range(2, n + 1):\n           result *= i\n       return result\n   ```\n   This is perfect. Output matches.✅\n   Proceeds. \n   [Output Generation] -> *Outputs exactly the code block*\n   (Note: I'll make sure there's absolutely no extra text, not even markdown if possible, but standard markdown code block is fine. The prompt says \"Just the code\", so I'll wrap it in a code block for clarity but keep it minimal.)\n   Actually, I'll just output the raw code or standard markdown. Both are fine. I'll use markdown code block.\n   Done. \n   Output matches the final code.✅\n   [Final Check]\n   - Function returns factorial? Yes.\n   - Python? Yes.\n   - Just code, no explanation? Yes.\n   All constraints met.✅\n   Proceeds. \n   [Output Generation] (matches the response)\n   ```python\n   def factorial(n):\n       if n < 0:\n           raise ValueError(\"Factorial is not defined for negative numbers\")\n       result = 1\n       for i in range(2, n + 1):\n           result *= i\n       return result\n   ```\n   Perfect. \n   *Self-Correction/Note during generation prep*: The prompt says \"Just the code, no explanation.\" I will strictly output only the code block. No greetings, no sign-offs. Exactly as requested.✅\n   Proceeds. \n   [Output] -> *Proceeds*\n</think>\n\n```python\ndef factorial(n):\n    if n < 0:\n        raise ValueError(\"Factorial is not defined for negative numbers\")\n    result = 1\n    for i in range(2, n + 1):\n        result *= i\n    return result\n```",
+        "word_count": 759,
+        "token_count": 1353,
+        "wall_clock_seconds": 161.01,
+        "tokens_per_sec": 8.6
+      }
+    ]
+  },
+  "Gemma2 9B": {
+    "short_factual": [
+      {
+        "success": true,
+        "response_text": "The capital of Japan is Tokyo.  \n",
+        "word_count": 6,
+        "token_count": 10,
+        "wall_clock_seconds": 13.72,
+        "tokens_per_sec": 23.7
+      }
+    ],
+    "strict_length_instruction": [
+      {
+        "success": true,
+        "response_text": "Why don't scientists trust atoms? \n\nBecause they make up everything! \n",
+        "word_count": 10,
+        "token_count": 19,
+        "wall_clock_seconds": 3.86,
+        "tokens_per_sec": 16.5
+      }
+    ],
+    "reasoning": [
+      {
+        "success": true,
+        "response_text": "Here's how to solve this:\n\n* **Calculate the travel time:** Divide the distance by the speed: 180 miles / 60 mph = 3 hours.\n* **Add the travel time to the departure time:** 3 pm + 3 hours = 6 pm.\n\n\nThe train arrives at **6 pm**. \n",
+        "word_count": 47,
+        "token_count": 74,
+        "wall_clock_seconds": 8.26,
+        "tokens_per_sec": 13.2
+      }
+    ],
+    "coding": [
+      {
+        "success": true,
+        "response_text": "```python\ndef factorial(n):\n  if n == 0:\n    return 1\n  else:\n    return n * factorial(n-1)\n```",
+        "word_count": 15,
+        "token_count": 39,
+        "wall_clock_seconds": 5.46,
+        "tokens_per_sec": 14.3
+      }
+    ]
+  }
+}
