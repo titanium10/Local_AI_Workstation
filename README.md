@@ -156,7 +156,7 @@ Iv've been working on this basically the whole week after setting up streamlit a
 
 ## Log: 5/27/26 - RAG System, Image analyser, and .bat launcher.
 ### Overview 
-After learning the basics of RAG, I added RAG succesfully and tested it out with the ai model, now the gui allso lets users upload documents and images and ask any question about them. added the ai model Llava so I can also analyse images, the model switches between the 2 models every time someone uploads an image. Lasly added a launcher because I have to do more things I launch the website so by adding a .bat file using the help with claude. i can just double click it to launch everything.
+After learning the basics of RAG, I added RAG successfully and tested it out with the ai model, now the gui allso lets users upload documents and images and ask any question about them. added the ai model Llava so I can also analyse images, the model switches between the 2 models every time someone uploads an image. Lasly added a launcher because I have to do more things I launch the website so by adding a .bat file using the help with claude. i can just double click it to launch everything.
 ### Problem Solved
 2 main problems were solved with this code and gui form the feedback I got from testers. Firstly I added RAG so people don't have to copy paste their pdfs and can directly upload them on to the model and ask questions about them seemlessly while getting accurrate data. And the 2nd problem is that people also wanted to test the ai's capability with image analysing. This was a bit challenging to do as I had to add another ai model to the gui but after trial and error and with the help of anthropic's Sonnet 4.6 I succesfully enabled it, Llava is still a really weak model since it's only 7B, but it can still provide somewhat accurate data to the images you ask it to analyse thorough uploading the images from you file explorer or copy-pasting them into the chat.
 ### Decisions
@@ -170,30 +170,30 @@ it's been a long time since I have been active on github, my summatives were goi
 
 ## Log: 5/30/26 — Live Usage Dashboard & TPS Monitoring
 ### Overview
-I spent some time adding a stats board that displays basic stats like how many messagess typed the amount of tokens used and tps. The stats refresh every 3 seconds, it is only accesable by the host, and its not linked anywhere.
+I spent some time adding a stats board that displays basic stats like how many messages typed the amount of tokens used and tps. The stats refresh every 3 seconds, it is only accessible by the host, and its not linked anywhere.
 ### decisions
-* I have put the live stats as a dictionary, so it can track if the ai is active or idle, the token count, and the tps. and python is persistant as long as Flask is active, so when someone uses it I can see all of it without affecting the main database.
+* I have put the live stats as a dictionary, so it can track if the ai is active or idle, the token count, and the tps. and python is persistent as long as Flask is active, so when someone uses it I can see all of it without affecting the main database.
 * I've used the Finally block for making the code cleaner and preventing crashes, by using try/except/finally it always makes the is_generating to false so if the user stops the message, the dashboard won't still show generating and crash.
 * I just used Ollama's eval_count and eval_duration which is insanely accurate upto nanoseconds, to give me the most accurate tps.
 * the dashboard resets every 3 seconds using the (meta http-equiv="refresh") this is just html so I don't have to update index2.
 ### Personal comments
-this was a short term decission as I spent most of my time looking for internships related to this so I get real feedback from ai engineers and hands on experiance, but apart from that the main reason I actually did this is to monitor how the ai model is doing, when many people use it it might slow down so I was thinking to add a queue so others can slowly use it without it crashing or becoming way too slow. This was also a really good excuse for me to learn more about tokens, so it is a win-win situation for me.
+this was a short term decision as I spent most of my time looking for internships related to this so I get real feedback from ai engineers and hands on experience, but apart from that the main reason I actually did this is to monitor how the ai model is doing, when many people use it it might slow down so I was thinking to add a queue so others can slowly use it without it crashing or becoming way too slow. This was also a really good excuse for me to learn more about tokens, so it is a win-win situation for me.
 
 
 
 
 ## Log: 6/7/26 — Voice to Voice, UI new design, and more settings
 ### Overview
-I added a voice to voice conversation where you can toggle on or off depending upon if you want it or not. Also changed the UI with a maroon red theme and added new animation for aesthetivs, also added more settings like toggling light mode/dark mode, toggling on voice responce, choosing what voice the ai should respond in, added a toggle for web search, and lastly choosing the temperature of the ai from 0 to 1.
+I added a voice to voice conversation where you can toggle on or off depending upon if you want it or not. Also changed the UI with a maroon red theme and added new animation for aesthetics, also added more settings like toggling light mode/dark mode, toggling on voice response, choosing what voice the ai should respond in, added a toggle for web search, and lastly choosing the temperature of the ai from 0 to 1.
 ### Problems solved
-The main problem I noticed was that you had to type everything to the app and i found that anoying as other models did have voice recognition, and the side setting panel only had one option which made it boring so i added more options, and I also wanted a uncensored version to myself as I also used the ai model for my personal use and I wanted other people using it to feel like it's a normal ai like other models.
+The main problem I noticed was that you had to type everything to the app and i found that annoying as other models did have voice recognition, and the side setting panel only had one option which made it boring so i added more options, and I also wanted a uncensored version to myself as I also used the ai model for my personal use and I wanted other people using it to feel like it's a normal ai like other models.
 ### Decisions
-* I first decided to use the browsers speach recognition but it required internet and also sends data to google, against my theme of keeping privacy for the users. I decided to Use whisper which runs locally on python and doesnt depend on cloud.
-* edge-tts for ai's voice output, it had the best voice quality compared to the other TTS options, it uses microsoft's servers for audio but conversation isnt sent.
+* I first decided to use the browsers speach recognition but it required internet and also sends data to google, against my theme of keeping privacy for the users. I decided to Use whisper which runs locally on python and doesn't depend on cloud.
+* edge-tts for ai's voice output, it had the best voice quality compared to the other TTS options, it uses Microsoft's servers for audio but conversation isn't sent.
 * edge-tts used to read **bold** as 'asterisk asterisk bold asterisk asterisk' so I removed all markdown before sending so the speech sounds good.
 * I added a variable called currentaudio so it tracks when the audio is playing and then stops when the user switches conversation or deletes a conversation.
 ### Personal comments
-The main reason I actually added voice to voice was so that I can just speak long messages and its more efficient and the ai responds in a voice so I can hear what it says while doing sommething else on the computer which is really efficient. I also chose a new UI I like the color maroon red, and purple really didn't seem my fit and I heavily like aesthetics so I also added more animation while I'm at changing the UI. I also added a uncensored version for myself because I use it for my personal purposes, and I still made a censored version for other IP's that are not the local host. Overall I think this went great I spent around 1.5 hours setting this up, with the help of claude for coding. Prompting this and testing the results out is really fun and with all of this I am also learning new things because I tell claude to explain me everything it changes.
+The main reason I actually added voice to voice was so that I can just speak long messages and its more efficient and the ai responds in a voice so I can hear what it says while doing something else on the computer which is really efficient. I also chose a new UI I like the color maroon red, and purple really didn't seem my fit and I heavily like aesthetics so I also added more animation while I'm at changing the UI. I also added a uncensored version for myself because I use it for my personal purposes, and I still made a censored version for other IP's that are not the local host. Overall I think this went great I spent around 1.5 hours setting this up, with the help of Claude for coding. Prompting this and testing the results out is really fun and with all of this I am also learning new things because I tell Claude to explain me everything it changes.
 
 
 
@@ -212,31 +212,31 @@ I added 20 quality of life features to the chat and the website ui. These featur
 * There wasn't a way to tell how many tokens the entire conversation was and when it was coming to an end because the model has a small token context, so I added a estimated token counter at the top right so see how long the chat is.
 * There wasn't any timestamps on messages, so I added a timestamp under every message.
 ### Decisions
-* The ai title selection is made right after the first responce so it doesn't affect the performance and gives better titles with barely and speed cost.
-* Persona is capped at 1000 characters to prevent bloating and missbeheaving.
+* The ai title selection is made right after the first response so it doesn't affect the performance and gives better titles with barely and speed cost.
+* Persona is capped at 1000 characters to prevent bloating and misbehaving.
 * the token counter uses a equation of 1 token = 4 characters, which gives an estimate of how many tokens are there in a chat.
 * sound affect is from web audio API, to generate a ping after generation.
 ### Personal comments
-It has been a long time since I made any changes to the app but I have used it a lot, I had come to india for vacation and couldnt find time, and I am planning to buy a seperate gpu with more vram so I can add more features and a better model and try out fine tuning. Overall this project today was easy I did require manually checking all the problems from testers and spent a hour testing if those problems were true and finding other problems I wanted to solve by comparing them to another ai ui like claude and gemini. Doing this was really fun because I did try to find loopholes and try to jailbrake the ai for a few minutes, and I will be fixing those in the future projects.
+It has been a long time since I made any changes to the app but I have used it a lot, I had come to india for vacation and couldnt find time, and I am planning to buy a seperate gpu with more vram so I can add more features and a better model and try out fine tuning. Overall this project today was easy I did require manually checking all the problems from testers and spent a hour testing if those problems were true and finding other problems I wanted to solve by comparing them to another ai UI like Claude and Gemini. Doing this was really fun because I did try to find loopholes and try to jailbreak the ai for a few minutes, and I will be fixing those in the future projects. 
 
 
 
 
 ## Log: 7/2/26 — Add concurrency queue: FIFO(First-In First-Out) ticket system with lock-based GPU access control, live queue position shown in UI
 ### Overview
-Added a FIFO (First-In First-Out) request to save ollama from continuous generation requests. Since the Vram would be a constraint top run more than one generation than a time. Multiple people using ngrok didn't have protection to go against it. This fixes the queing system, with the live queue-position in the UI.
+Added a FIFO (First-In First-Out) request to save ollama from continuous generation requests. Since the Vram would be a constraint top run more than one generation than a time. Multiple people using ngrok didn't have protection to go against it. This fixes the queuing system, with the live queue-position in the UI.
 ### Problems Solved
-* There wasn't any protection, so if mutliple people sent messages at the same time, it would cause GPU contention, or a request getting starved.
+* There wasn't any protection, so if multiple people sent messages at the same time, it would cause GPU contention, or a request getting starved.
 * Users didn't have any feedback while waiting as there was only a thinking animation, without any indication of anything happening.
 * To guarantee fairness added a first-come first-serve system without adding any complicated infrastructure.
 ### Decisions
-* Used Python's built in threading.lock() as the gatekeeper, this solves any complex codeing, and can hold only one thread at a time, which will guarantee that Ollama never gets 2 generation calls at once.
-* used a pooling loop that checks every 0.3 to 0.5 seconds, and instead of a elegent event based wake-up system there will the a simpler reason about and harder to get subtly wrong at this scale with multiple concurrent users not thousands.
-* Also put the waiting logic inside the streaming generator function, instead of being before the HTTP responce. It will show live that "You are #2 in queue" and it updates through the SEE/XHR stream, instead of the browser being with no responce.
-* It is wrapped arounf a lock-release logic in a finally block so it will always run. Whether it's success, error, or user hitting stop. Since the lock never gets released it would not freeze for all the other users.
-* Added a 300-second timeout as a safety net just in case ollama gets bugged ans stuck so people don't wait forever.
-### Peronal comments
-After spending time on the web app I have been creating I have moved on to this project again, to take a break while still learning. I added this feature to prevent people from having a tough user experiance when multiple people are using the app. I noticed this when me and my dad were using generating responces at the same time, and the ai sometimes didn't respong or didn't read the responce, which would have been more common if there were more users, so I fixed the whole app so now there is a queue with a really small waiting time.
+* Used Python's built in threading.lock() as the gatekeeper, this solves any complex coding, and can hold only one thread at a time, which will guarantee that Ollama never gets 2 generation calls at once.
+* used a pooling loop that checks every 0.3 to 0.5 seconds, and instead of a elegant event based wake-up system there will the a simpler reason about and harder to get subtly wrong at this scale with multiple concurrent users not thousands.
+* Also put the waiting logic inside the streaming generator function, instead of being before the HTTP response. It will show live that "You are #2 in queue" and it updates through the SEE/XHR stream, instead of the browser being with no response.
+* It is wrapped around a lock-release logic in a finally block so it will always run. Whether it's success, error, or user hitting stop. Since the lock never gets released it would not freeze for all the other users.
+* Added a 300-second timeout as a safety net just in case ollama gets bugged and stuck so people don't wait forever.
+### Personal comments
+After spending time on the web app I have been creating I have moved on to this project again, to take a break while still learning. I added this feature to prevent people from having a tough user experience when multiple people are using the app. I noticed this when me and my dad were using generating responses at the same time, and the ai sometimes didn't respond or didn't read the response, which would have been more common if there were more users, so I fixed the whole app so now there is a queue with a really small waiting time.
 
 
 
@@ -245,10 +245,10 @@ After spending time on the web app I have been creating I have moved on to this 
 ### Overview
 Replaced the initial token counter (1 token = 4 characters) with the llama 3 tokenizer, and it provides accurate token data rather than a estimate. also added a /api/tokenize and also updated the frontend counter to update it.
 ### Problems Solved
-* Based on the text type and the length of the conversation the estimate can be upto 30% off by the actual token count, which will matter when you are coming close to the 8k context limit of llama 3.1.
-* Meta's official Llama3.1 tokenizer on Hugging Face uses a gated access, and I worked around this by using the public open mirror (NousResearch/Meta-Llama-3-8B) that gives the same identical tokenzier.
+* Based on the text type and the length of the conversation the estimate can be up to 30% off by the actual token count, which will matter when you are coming close to the 8k context limit of llama 3.1.
+* Meta's official Llama3.1 tokenizer on Hugging Face uses a gated access, and I worked around this by using the public open mirror (NousResearch/Meta-Llama-3-8B) that gives the same identical tokenizer.
 ### Decisions
-* Used hugging face's tokenizer library instead of OpenAi's tiktoken tokenzier, because in a way tiktoken doesnt match the vocabulary of llama 3.1 so the tokens will still be inaccurate.
+* Used hugging face's tokenizer library instead of OpenAi's tiktoken tokenzier, because in a way tiktoken doesn't match the vocabulary of llama 3.1 so the tokens will still be inaccurate.
 * Tokenizer loads right after flask loads, and then gets cached to the disk immediately by the library after the first successful run, then there are no needed network calls for the future.
 * Wrapped in a tokenizer load in try/except with a fallback to the old estimate because if it fails the app will still be working a bit inaccurately based on the estimates.
 * On the front it will show the character estimate instantly with no lag, and when the exact count responds in the backend it avoids the counter being frozen while waiting for the network round-trip.
@@ -273,3 +273,22 @@ Swapped Llama# 8B to Bonsai 27B, with 1-bit quantization that comfortably fits i
 * the warm-start runs on its own in background window so it doesn't block Flask or Ngrok.
 ### Personal comments
 This whole month I have been working on another project, and I decided to make a small but drastic change because of a few complaints regarding the memory issue, this took me around an hour to implement, and it works great as there is a new smarter model and a better memory system. I am also using this system in a small raspberry pi system I did and it works really well, over time I might decide to test this in multiple different devices and run the a similar program on it so that it always stays on.
+
+
+
+
+
+## Log 8/17/26 Model Benchmark and Swap: Llama3 8B vs Bonsai 27B vs Gemma2 9B
+### Overview
+A few weeks back I swapped the text model Llama3 8B to Bonsai 27B (1-bit quantization), I was looking forward to more parameters and a smarter model in the same VRAM allocation. But real usage faced a problem, basic simple prompts were coming really bloated and slow. So I swapped the model to Gemma2 9B to fix it, then built benchmark_models.py to measure all 3 models instead of relying on a anecdote. so the final call was based on real numbers, and not just a call.
+### Problem Solved
+* Bonsai 27B's 1-bit quantization caused a massive quality degrade. a short prompt like "tell me a joke in under 10 words" produced 1,192 tokens and took over 5 minutes instead of a short answer.
+* There was no way to compare the models objectively. And decisions were based on self testing, and the data wasn't consistent or repeatable.
+* Needed Proof for why I changed the model from Bonsai to Gemma, so needed a rigorous test to show why Bonsai got replaced.
+### Decisions
+* Built the Benchmark with 4 prompts (short factual, strict length instructions, reasoning, coding) rather than a single strict length instructed prompt that targets the same failure mode that got Bonsai replaced.
+* Measured tps directly from Ollama's eval_count/eval_duration fields rather than giving a good estimate. So the numbers show the actual generation speed.
+* Kept the benchmark honest about its own limits: gave 1 run per prompt, a single machine, and a word-count-based instruction that follows check rather than a human or a AI-graded quality documented directly in the script.
+180-second timeout per prompt, it is generous for models that take time for a response. But Bonsai failed to finish in the the time given with the prompt within that window. So the timeout became a data point to consider.
+### Personal comments
+Its been over 2 weeks since I did any changes or commits to this repo, I have been really busy as school started and I travelled. But during that time I tried out multiple linux systems on a raspberry pi to have future projects related to it. So I have been getting a few comments and feedback about the new model change, and people were annoyed about the really long wait time for simple tasks and prompts, and that made them refuse to take it. I thought it was a problem with the code so I tried to run a few checks and tweak the code a few times, and then when i finally ran the Bonsai 27B on Ollama I realized it was the model itself that was the problem. After that I ran a few benchmarks again because I did get new models and I was deciding what to put as a new text model so I put 3 models side by side and got the best performing model which was the Gemma2 9B by google. till now I thought having more parameters means the model would be better but I came to the conclusion after studying about it that there are lots of other factors like hallucination, call speed and many more that affect a model's performance.
