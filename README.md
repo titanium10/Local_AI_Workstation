@@ -278,7 +278,7 @@ This whole month I have been working on another project, and I decided to make a
 
 
 
-## Log 8/17/26 Model Benchmark and Swap: Llama3 8B vs Bonsai 27B vs Gemma2 9B
+## Log 8/17/26 - Model Benchmark and Swap: Llama3 8B vs Bonsai 27B vs Gemma2 9B
 ### Overview
 A few weeks back I swapped the text model Llama3 8B to Bonsai 27B (1-bit quantization), I was looking forward to more parameters and a smarter model in the same VRAM allocation. But real usage faced a problem, basic simple prompts were coming really bloated and slow. So I swapped the model to Gemma2 9B to fix it, then built benchmark_models.py to measure all 3 models instead of relying on a anecdote. so the final call was based on real numbers, and not just a call.
 ### Problem Solved
@@ -292,3 +292,21 @@ A few weeks back I swapped the text model Llama3 8B to Bonsai 27B (1-bit quantiz
 180-second timeout per prompt, it is generous for models that take time for a response. But Bonsai failed to finish in the the time given with the prompt within that window. So the timeout became a data point to consider.
 ### Personal comments
 Its been over 2 weeks since I did any changes or commits to this repo, I have been really busy as school started and I travelled. But during that time I tried out multiple linux systems on a raspberry pi to have future projects related to it. So I have been getting a few comments and feedback about the new model change, and people were annoyed about the really long wait time for simple tasks and prompts, and that made them refuse to take it. I thought it was a problem with the code so I tried to run a few checks and tweak the code a few times, and then when i finally ran the Bonsai 27B on Ollama I realized it was the model itself that was the problem. After that I ran a few benchmarks again because I did get new models and I was deciding what to put as a new text model so I put 3 models side by side and got the best performing model which was the Gemma2 9B by google. till now I thought having more parameters means the model would be better but I came to the conclusion after studying about it that there are lots of other factors like hallucination, call speed and many more that affect a model's performance.
+
+
+
+
+
+## Log 8/22/26 - Environment-based configuration
+### Overview
+Moved every hardcoded value out of app.py. The windows-only ChromaDB path, Flask secret key, active model names, and port number to a .env file loaded with python-dotenv. Also added .env.example as a safe template for anybody trying to clone the repo, so they know what to configure without looking at my values.
+### Problems Solved
+* CHROMA_PATH was hardcoded as a Windows path. Which only worked in the laptop I am using, moving to another computer or sharing the repo would have broken it.
+* The Flask SECRET_KEY, which signs the session cookies, it was only in plain text directly in the public Github repo. the real security problem hadn't been caught till the reviewing of the codebase for improvements.
+* There wasn't a good way to test other models or ports without editing code.
+### Decisions
+* Used os.getenv("KEY", fallback) everywhere instead of using os.environ["KEY"], a missing .env value brings it to a safe default (or, for CHROMA_PATH specifically, a empty string that is failing rather than a quiet working on my machine and breaking elsewhere)
+* .env is gitignored and it's never in Github; .env.example, is in instead it has the placeholder names, key names, so the repo is cloneable without revealing my secret keys.
+* Chose not to hardcore a "real looking" fallback for SECRET_KEY, the fallback is obvious on purpose ("change-me-in-your-env-file") so nobody ships it to production accidently without using it.
+### Personal comments
+The reason I added this feature was that there were a few of my friends that wanted to clone my repo or copy the same thing on their pcs. and I had a few things that couldn't be cloned on their pcs, so I decided to add a .env so that they can add their own keys and other private details. I will also be adding more features related to this in the future as more people start using this.
