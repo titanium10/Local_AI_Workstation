@@ -12,6 +12,26 @@ import asyncio
 import queue
 import threading
 
+# ── Environment-based configuration ────────────────────────────────────
+# Before this, paths like CHROMA_PATH were hardcoded directly in the code
+# as "C:\Users\samra\..." — only ever going to work on this exact laptop,
+# with this exact Windows username, in this exact folder. Move the
+# project to the home server, or hand the repo to someone else on the
+# Launchpad crew, and it silently breaks.
+#
+# python-dotenv fixes this by loading settings from a separate ".env"
+# file sitting in the project folder, instead of from the code itself.
+# load_dotenv() reads that file and copies its values into the same
+# place Python normally keeps environment variables (os.environ) — so
+# every os.getenv("SOME_KEY") call below this line can see them.
+#
+# .env itself is listed in .gitignore and NEVER gets pushed to GitHub —
+# it's specific to whoever's machine is running the app. What DOES get
+# committed is .env.example: the same key names with placeholder values,
+# so anyone cloning the repo knows exactly what they need to fill in.
+from dotenv import load_dotenv
+load_dotenv()
+
 os.environ['PYTHONUNBUFFERED'] = '1'
 
 import chromadb
@@ -73,12 +93,22 @@ def count_tokens(text):
 whisper_model = whisper.load_model("base")
 
 app = Flask(__name__)
-app.secret_key = "samrat-ai-secret-key-2025"
+# os.getenv("KEY", "fallback") reads from .env first; if that key isn't
+# set there for some reason, it falls back to the value after the comma
+# rather than crashing. The SECRET_KEY fallback here is intentionally
+# weak/obvious — it's ONLY meant to stop the app from crashing on a
+# missing .env, not to be an acceptable real secret. Always set a real
+# one in your own .env file.
+app.secret_key = os.getenv("SECRET_KEY", "change-me-in-your-env-file")
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
-DB_FILE = "chats.db"
-CHROMA_PATH = r"C:\Users\samra\OneDrive\Desktop\Chroma DB Real"
+DB_FILE = os.getenv("DB_FILE", "chats.db")
+# No hardcoded Windows path fallback here on purpose — if CHROMA_PATH
+# isn't set in .env, we want that to be OBVIOUS (an empty string makes
+# Chroma fail loudly on startup) rather than silently working on your
+# machine and quietly breaking on anyone else's.
+CHROMA_PATH = os.getenv("CHROMA_PATH", "")
 UPLOADS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
 
 # ── Text model: Gemma2 9B (previously Bonsai 27B, before that Llama3 8B) ──
@@ -100,8 +130,15 @@ UPLOADS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploa
 # IMAGE MESSAGES STILL USE LLAVA, NOT THE TEXT MODEL. Gemma2 9B doesn't
 # have vision support in Ollama's standard build, so this split (separate
 # text vs. vision model) stays exactly as it was for Bonsai.
-TEXT_MODEL = "gemma2:9b"
-VISION_MODEL = "llava"
+#
+# Reading these from .env (rather than hardcoding "gemma2:9b" directly)
+# is also what makes the NEXT queued feature — a model dropdown in the
+# settings UI — straightforward to build: the dropdown just needs to
+# change what's effectively this same value, instead of requiring a code
+# edit and a restart every time you want to try a different model.
+TEXT_MODEL = os.getenv("TEXT_MODEL", "gemma2:9b")
+VISION_MODEL = os.getenv("VISION_MODEL", "llava")
+FLASK_PORT = int(os.getenv("FLASK_PORT", "5000"))
 os.makedirs(UPLOADS_FOLDER, exist_ok=True)
 
 chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
@@ -1306,4 +1343,4 @@ def speak():
 
 if __name__ == "__main__":
     init_db()
-    app.run(debug=False, port=5000, threaded=True)
+    app.run(debug=False, port=FLASK_PORT, threaded=True)
